@@ -44,7 +44,7 @@ key is a 32-byte Ed25519 **seed**, also 64 hex chars.
 
 `cef publish` resolves the AS keypair AWS-CLI-style — flags beat env, env
 beats files, files beat the shared INI. The **first** source that yields a
-complete keypair wins (`resolveCredentials` in `src/lib/credentials.ts`):
+complete keypair wins:
 
 | # | Source | How |
 | --- | --- | --- |
@@ -104,8 +104,8 @@ of embedded inline. It requires:
    Because push's signing key is unrelated to the AS identity, this is how
    the manifest gets stamped: `agentServicePubkey = <asPubkey>` and
    `agentId = <asPubkey>:<alias>`. With it stamped, bucket consumers (the
-   dashboard registry read, the vault-api connect check) see a
-   fully-identified manifest immediately — no need to wait for `cef publish`.
+   dashboard registry read, the `connect` check) see a fully-identified
+   manifest immediately — no need to wait for `cef publish`.
 
 ```bash
 # Owner pushes with the bucket's secret phrase

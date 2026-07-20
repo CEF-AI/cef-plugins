@@ -1,45 +1,129 @@
-# Deploying in ROC
+# Deploying: the `deployments/` folder, `cef deploy`, and ROC setup
 
-`cef build` → `cef push` → `cef publish` gets your agent's manifest into the DDC
-registry and its card into the marketplace — but the orchestrator **does not
-select or serve it until a deployment targets it** (ADR-038). Deployment is
-control-plane state, applied today as a **ROC console action** (a `cef deploy`
-CLI is coming). This file covers the human-only steps in ROC that bracket the
-CLI flow, plus what the skill should do when a prerequisite is missing.
+`cef build` → `cef push` gets your agent's manifest and bundle into the DDC
+registry, but the CEF platform **does not select or serve it until a deployment
+targets it**. `cef deploy` is the step that makes an agent live and testable
+(including in a sandbox). Marketplace **publish is optional and comes last** — it
+only lists the agent's card for discovery and can be skipped entirely for debug,
+test, or sandbox use.
 
-## The two ROC touchpoints
+Two setup actions still happen in the ROC console (they can't be done from the
+CLI): creating the Agent Service and minting a DDC registry access token. This
+file covers those, the `deployments/` folder, the `cef deploy` command, and what
+the skill should do when a prerequisite is missing.
 
-The CLI flow depends on two things that only exist once you set them up in the
-ROC console, and one action you take after publishing:
+## The `deployments/` folder is the source of truth
 
-1. **Before `cef push`** — an Agent Service (giving you an AS pubkey) and a DDC
-   registry access token.
-2. **After `cef publish`** — click **Deploy** and select a version.
+An agent project declares its deployment records as files: one record per
+`deployments/<name>.jsonc`, where the filename stem is the record `name`. This
+mirrors the `migrations/<cubby>/` and `widgets/<id>/` conventions. `cef deploy`
+reads the whole folder, assembles the deployment SET, and applies it to the
+target environment.
 
-## Prerequisite A — Agent Service + AS pubkey
+### Record fields (in-file)
 
-`cef push --as-pubkey <hex>` and `cef publish --as-pubkey <hex>` both require
-the **on-platform Agent Service pubkey**. This is the *routing* identity the
-orchestrator looks up to deliver events — provisioned by TSS-DKG on a real
-cluster and shown in the ROC console. It is distinct from the AS Ed25519
-keypair that signs the publish envelope (`cef keypair generate`).
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `priority` | int | yes | **Lower wins.** Selects which record applies when several match. |
+| `targeting` | string | yes | A CEL expression over `vault.id` / `vault.scope` / `event.type`. Empty string `""` = always eligible. |
+| `version` | string | yes | A semver (e.g. `1.4.0`) or the literal `"latest"`. |
+| `weight` | int ≥ 1 | no (default 1) | Splits traffic **within a priority tier** — this is how you run an A/B. |
+| `enabled` | bool | no (default true) | Set false to keep a record on disk but inactive. |
+| `params` | object | no | Parameters passed to the agent for this record. |
+| `engagements` | object | no | Per-engagement overrides. |
+| `expiresAt` | RFC3339 | no | Drops the record after this time — handy for sandbox cleanup. |
 
-In ROC: open (or create) your **Agent Service**; its details dialog shows the
-AS pubkey (hex). Copy it — you pass the same value to both `--as-pubkey` flags.
+### SET rules (the folder must satisfy)
 
-> Gotcha: a card can `cef publish` fine yet be **unroutable** if
-> `agentServicePubkey` does not match a provisioned AS on the cluster. The
-> marketplace verifies the envelope signature against `X-AS-Pubkey` but does
-> **not** tie it to the `agentId` prefix. The vault-api connect check *does*
-> enforce `agentId` starts with `agentServicePubkey:` — so use the real
-> provisioned AS pubkey, not just any local keypair, for anything that must run.
+- At least one record.
+- **Exactly one** record with empty `targeting` — the mandatory
+  default/fallthrough, so selection is never empty.
+- Unique lowercase-slug `name`s.
+- `weight >= 1` on every record.
+- A non-empty `version` on every record.
 
-## Prerequisite B — DDC registry access token
+### Audiences & A/B
 
-`cef push` writes the manifest + bundle into your Agent Service's **DDC
-registry bucket** (the bucket *is* the registry). To authorize the write
-without handing out the bucket's raw Sr25519 secret phrase, mint a token in
-ROC:
+`targeting` decides *who* a record applies to. Among the records that match a
+given vault/event, the **lowest `priority` tier wins**; if that tier holds more
+than one record, traffic splits between them by `weight` (an A/B split). Give the
+default (empty-`targeting`) record a HIGH priority number — e.g. `99` — so it is
+the fallthrough and more specific, lower-priority records win when present.
+
+> `version: "latest"` **fails closed** if `latest` was never pushed. Prefer a
+> pinned semver for anything that must run.
+
+### Example files a scaffolded project ships
+
+```jsonc
+// deployments/default.jsonc  — the mandatory fallthrough
+{
+  "priority": 99,
+  "targeting": "",
+  "version": "latest",
+  "weight": 1
+}
+```
+
+```jsonc
+// deployments/sandbox-canary.jsonc  — a pinned build for sandbox vaults
+{
+  "priority": 10,
+  "targeting": "vault.scope == 'sandbox'",
+  "version": "1.4.0",
+  "weight": 1
+}
+```
+
+Here a sandbox-scoped vault matches both records; priority 10 beats priority 99,
+so it gets the pinned `1.4.0`. Everyone else falls through to the default.
+
+## `cef deploy` — the command
+
+```bash
+npx cef deploy [--version <v>] [--endpoint <url>] \
+               [--as-pubkey <hex>] [--author <who>] [--note <msg>] [--dry-run]
+```
+
+- Reads `deployments/` and applies the assembled SET. **Errors if the folder is
+  absent or empty** — there is nothing to deploy.
+- `--endpoint` (or `$CEF_ENDPOINT`) selects WHERE to apply, defaulting to the dev
+  environment. It is **orthogonal** to the deployment files: the same
+  `deployments/` folder applies to any environment. Do **not** put environment
+  names inside deployment files.
+- `--version <v>` overrides the `version` in the applied records without
+  editing files — the everyday "pushed a new build, roll it out" step.
+- The whole folder is applied as one set (declarative desired state): a record
+  deleted locally disappears remotely on the next deploy.
+- `--author` / `--note` annotate the applied set for audit.
+- `--dry-run` prints what would be applied without applying it. Use it to confirm
+  the assembled set before a real deploy.
+
+The ROC console **Deploy** button applies the same deployment set; either path
+works.
+
+## ROC setup step 1 — Agent Service + AS pubkey
+
+`cef push --as-pubkey <hex>`, `cef deploy --as-pubkey <hex>`, and
+`cef publish --as-pubkey <hex>` all require the on-platform **Agent Service
+pubkey**. This is the *routing* identity the platform looks up to deliver events;
+it is provisioned by the platform and shown in the ROC console. It is distinct
+from the AS Ed25519 keypair that signs the publish envelope (`cef keypair
+generate`).
+
+In ROC: open (or create) your **Agent Service**; its details dialog shows the AS
+pubkey (hex). Copy it — you pass the same value to every `--as-pubkey` flag.
+
+> Gotcha: an agent can `cef publish` fine yet be **unroutable** if its AS pubkey
+> does not match a provisioned Agent Service. The `connect` check enforces that
+> the `agentId` begins with the provisioned AS pubkey — so always use the real
+> provisioned pubkey, not just any local keypair, for anything that must run.
+
+## ROC setup step 2 — DDC registry access token
+
+`cef push` writes the manifest + bundle into your Agent Service's **DDC registry
+bucket** (the bucket *is* the registry). To authorize the write without handing
+out the bucket's raw secret phrase, mint a token in ROC:
 
 1. Open the **ROC console** → your **Agent Service** → **Access** tab.
 2. It shows the AS's registry `bucketId` and a "generate access token" control
@@ -47,95 +131,61 @@ ROC:
 3. Generate and **copy immediately — the token is shown once.** Note the
    `bucketId` too — you pass it to `cef push --bucket`.
 
-What the token is (from `accountStore.ts` `createRegistryAccessToken`): a
-**base58, full-access (GET/PUT/DELETE) DDC AuthToken scoped to that bucket**,
-signed by the bucket-owning wallet, with no `subject` — a **bearer** token any
-holder can use until it expires. It is **stateless and cannot be individually
-revoked**; it only expires (default ~30 days). Prefer a short window and
+The token is a base58, full-access (GET/PUT/DELETE) DDC token scoped to that
+bucket, signed by the bucket-owning wallet. It is a **bearer** token any holder
+can use until it expires; it is stateless and **cannot be individually
+revoked** — it only expires (default ~30 days). Prefer a short window and
 regenerate on exposure.
-
-Hand it to `cef push` as `--access-token` or `$CEF_DDC_ACCESS_TOKEN`:
 
 ```bash
 export CEF_DDC_ACCESS_TOKEN="<base58 token from ROC>"
 cef push --bucket <bucketId> --as-pubkey <asPubkeyHex>
 ```
 
-`push.ts` requires **exactly one** of `--access-token` / `$CEF_DDC_ACCESS_TOKEN`
-or `--secret-phrase` / `$CEF_DDC_SECRET_PHRASE`. Neither → hard error; both →
-hard error. The token path is the common team case (you don't hold the phrase).
-
-## The Deploy action (after `cef publish`)
-
-Once the card is published, go to the agent in the ROC console and click
-**Deploy**, selecting the **version** to make live. A deployment pins one
-version and makes it live for connected users; the orchestrator only serves a
-version a deployment targets.
-
-Under the hood ROC applies a deployment **set** to the orchestrator's
-deployments API, keyed by the composite `agentId` (`<asPubkey>:<alias>`). The
-minimal "make it live" set is a single default that catches everything:
-
-```jsonc
-// PUT /api/v1/agents/<asPubkey>:my-agent/deployments
-{
-  "author": "you@cere.io",
-  "note": "go live",
-  "deployments": [
-    { "name": "default", "priority": 99, "targeting": "", "weight": 1, "version": "latest" }
-  ]
-}
-```
-
-`validate.go` requires exactly **one default** (a deployment with empty
-`targeting`) — the mandatory fallthrough so selection is never empty. It also
-requires `weight >= 1`, a non-empty `version` (a semver or the literal
-`"latest"`), and unique lowercase slug `name`s. Keep the default at a high
-`priority` (e.g. `99`) so more specific, lower-`priority` deployments win when
-you add them for a rollout.
-
-To ship a new version: bump `version` in `cef.config.ts`, re-run
-build/push/publish, then leave the `latest` default in place, or add a
-lower-`priority` (or same-priority, weighted) deployment pinned to the new
-semver for a controlled rollout.
+`cef push` requires **exactly one** of `--access-token` /
+`$CEF_DDC_ACCESS_TOKEN` or `--secret-phrase` / `$CEF_DDC_SECRET_PHRASE`. Neither
+→ hard error; both → hard error. The token path is the common team case (you
+don't hold the phrase).
 
 ## Detect the missing prerequisite → hand back the exact next step
 
-The skill should not just run commands — it should diagnose *which* gate is
-unmet and return the precise command or ROC step. Detection cues, in flow order:
+Diagnose *which* gate is unmet and return the precise command or ROC step. In
+flow order:
 
 | Symptom / state | What's missing | Hand back |
 |---|---|---|
-| No AS keypair (`~/.cef/*.key` or `~/.config/cef/credentials`, `$CEF_AS_*`) | Publisher identity | `cef keypair generate --out ~/.cef/my-agent.key` (once; share via secrets manager) |
-| No AS pubkey to pass `--as-pubkey` | Prerequisite A | "Open ROC → your Agent Service → copy the AS pubkey (hex)" |
-| `push` errors "no DDC authorization" | Prerequisite B | "Open ROC → Agent Service → Access → generate token; `export CEF_DDC_ACCESS_TOKEN=…`" (note the `bucketId` for `--bucket`) |
+| No AS keypair (`~/.cef/*.key`, `~/.config/cef/credentials`, `$CEF_AS_*`) | Publisher identity | `cef keypair generate --out ~/.cef/my-agent.key` (once; share via a secrets manager) |
+| No AS pubkey to pass `--as-pubkey` | ROC setup step 1 | "Open ROC → your Agent Service → copy the AS pubkey (hex)" |
+| `push` errors "no DDC authorization" | ROC setup step 2 | "Open ROC → Agent Service → Access → generate token; `export CEF_DDC_ACCESS_TOKEN=…`" (note the `bucketId` for `--bucket`) |
 | `push` errors "both … provided" | Ambiguous auth | Unset one of `$CEF_DDC_SECRET_PHRASE` / `$CEF_DDC_ACCESS_TOKEN` (or drop one flag) |
 | `push` errors "bundle not found" / "no built agents" / "no version" | Build not run | `cef build` first |
-| `publish` errors "bundle not uploaded — run `cef push` first" (empty `bundle.cid`) | Push not run | `cef push --bucket <id> --as-pubkey <hex>` |
-| `publish` REPLAY (HTTP 409, nonce reused) | Transient | Re-run `cef publish` (fresh nonce minted each call) |
-| Published but a user's `connect` never gets served | No deployment | "Open ROC → the agent → **Deploy** → select version" (or PUT the default set above) |
-| `connect` rejected (agentId prefix mismatch) | Wrong AS pubkey | Re-push/publish with the **provisioned** AS pubkey so `agentId` = `<asPubkey>:<alias>` |
+| `deploy` errors "no deployments" / empty folder | No records to apply | Create `deployments/default.jsonc` (priority 99, targeting `""`), then re-run |
+| Pushed but a user's `connect` never gets served | Not deployed | `npx cef deploy --endpoint <url> --as-pubkey <hex>` (or ROC → the agent → **Deploy**) |
+| `connect` rejected (agentId prefix mismatch) | Wrong AS pubkey | Re-push/deploy with the **provisioned** AS pubkey so `agentId` starts with it |
+| Card absent from the marketplace, but the agent runs | Not published | `npx cef publish …` — optional, discovery only |
 
 Rule of thumb: the CLI's own error strings name the missing gate ("run
-`cef build` first", "run `cef push` first", "no DDC authorization"). Surface
-that string verbatim, then translate it into the one next command or ROC click
-— don't guess further ahead than the current gate.
+`cef build` first", "no DDC authorization"). Surface that string verbatim, then
+translate it into the one next command or ROC click — don't guess further ahead
+than the current gate.
 
-## The full deploy loop (for reference)
+## The full flow (for reference)
 
 ```bash
-# one-time: publisher identity (share via secrets manager, not per-dev)
+# one-time: publisher identity (share via a secrets manager, not per-dev)
 cef keypair generate --out ~/.cef/my-agent.key
 # one-time per token window: copy from ROC → Agent Service → Access
 export CEF_DDC_ACCESS_TOKEN="<base58 token from ROC>"
 
-cef build
-cef push    --bucket <bucketId>            --as-pubkey <asPubkeyHex>
-cef publish --keystore ~/.cef/my-agent.key --as-pubkey <asPubkeyHex>
-# then, in ROC: click Deploy and select the version   (cef deploy CLI is coming)
+npx cef init                                            # scaffold, incl. deployments/
+npx cef build
+npx cef push    --bucket <bucketId>            --as-pubkey <asPubkeyHex>
+npx cef deploy  --endpoint <url>               --as-pubkey <asPubkeyHex>   # makes it live
+# optional, last — only if you want a marketplace listing:
+npx cef publish --keystore ~/.cef/my-agent.key --as-pubkey <asPubkeyHex>
 ```
 
-The marketplace base URL defaults to the dev cluster
-(`https://agent-marketplace.compute.dev.ddcdragon.com`); override with
-`--marketplace` or `$CEF_MARKETPLACE_URL`. Select the DDC network for `push`
-with `--preset MAINNET|TESTNET|DEVNET` (default `MAINNET`) or `--endpoint`.
+The `--endpoint` (or `$CEF_ENDPOINT`) defaults to the dev environment; point it
+at another environment to deploy there — the same `deployments/` folder applies
+either way. Select the DDC network for `push` with `--preset
+MAINNET|TESTNET|DEVNET` (default `MAINNET`) or `--endpoint`.
