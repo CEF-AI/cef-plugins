@@ -97,9 +97,44 @@ preserves literal types. Key `AgentConfig` fields (see
 - **`idleTimeout`** — duration string (`"30m"` default; `"0s"` disables). Parsed
   to ms into `manifest.idleTimeout`; on expiry the orchestrator marks the Job
   terminal and dispatches the synthetic close event.
-- **`eventSchemas`** — JSON Schemas for events this agent *owns*.
+- **`eventSchemas`** — JSON Schemas for events this agent *owns* (see "Typed
+  event payloads" below).
 - **`agentServicePubkey`** — optional; stamps full identity at build time.
 - **`targeting`** — DEPRECATED (ADR-038): use on-engagement fields instead.
+
+## Typed event payloads (`eventSchemas` + `cef typegen`)
+
+`@OnEvent("t")` and `ctx.publish("t", …)` accept any string by default, so you
+can ship without declaring schemas. To get **autocomplete + payload type
+checking** on your own events, declare their JSON Schema in `eventSchemas`
+(`Record<eventType, JSONSchema>`) and run `cef typegen`, which folds them into
+`KnownEventTypes` so `Event<P>` and the `publish` payload are typed.
+
+```ts
+// cef.config.ts
+export default defineAgent({
+  id: "echo",
+  version: "0.1.0",
+  entry: "./src/agent.ts",
+  eventSchemas: {
+    feedback: {
+      type: "object",
+      properties: { rating: { type: "number" } },
+      required: ["rating"],
+    },
+    feedback_ack: {
+      type: "object",
+      properties: { rating: { type: "number" } },
+      required: ["rating"],
+    },
+  },
+});
+```
+
+Then `cef typegen` (writes `.cef/generated.d.ts` + `cef.lock.json`) makes
+`@OnEvent("feedback")` give `event.payload.rating: number` and type-checks
+`ctx.publish("feedback_ack", { rating })`. Declare schemas only for events this
+agent owns; peer-published event schemas are pulled from the peer's manifest.
 
 ## Runtime & manifest model
 

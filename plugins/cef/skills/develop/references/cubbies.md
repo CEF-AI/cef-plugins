@@ -147,6 +147,32 @@ const rows = await h
 // rows -> [{ text: "hello" }]
 ```
 
+## Adding a second cubby
+
+Cubbies are independent — add another entry to `cubbies[]` with its own
+migrations dir, and declare **every** alias you touch in **both** places:
+
+```ts
+// cef.config.ts
+cubbies: [
+  { alias: "history", migrations: "./migrations/history" },
+  { alias: "ratings", migrations: "./migrations/ratings" }, // new
+],
+```
+
+```ts
+// the test harness must list the same aliases — cubby(alias) throws otherwise
+h = testAgent(MyAgent, {
+  cubbies: [
+    { alias: "history", migrations: HISTORY_MIGRATIONS },
+    { alias: "ratings", migrations: RATINGS_MIGRATIONS },
+  ],
+});
+```
+
+Forgetting to add the new alias to the test's `cubbies` is the usual trip-up —
+`ctx.cubby("ratings")` then throws "alias not declared" at dispatch.
+
 ## Gotchas
 
 - **`exec` is single-statement.** In handlers, one statement per `.exec()`

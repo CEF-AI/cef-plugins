@@ -60,6 +60,21 @@ describe("echo agent", () => {
 });
 ```
 
+### Asserting a published event's payload
+
+`dispatch()` returns the events published during that call. To assert a
+specific event carried the right body, `find` it and read `.payload` (type it
+with a cast, or declare the event in `eventSchemas` + run `cef typegen` for real
+types):
+
+```ts
+const events = await h.dispatch({ type: "feedback", payload: { rating: 5 } });
+
+const ack = events.find((e) => e.type === "feedback_ack");
+expect(ack).toBeDefined();
+expect((ack!.payload as { rating: number }).rating).toBe(5);
+```
+
 ### Lifecycle (`@OnStart` / `@OnClose`)
 
 `start()` runs the agent's `@OnStart` hook; `close(reason)` runs `@OnClose`.
