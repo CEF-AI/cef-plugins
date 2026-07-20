@@ -23,7 +23,7 @@ export default defineAgent({
 });
 ```
 
-`CubbyDecl` shape (from `packages/agent-sdk/src/config/define-agent.ts`):
+`CubbyDecl` shape:
 
 ```ts
 interface CubbyDecl {
@@ -54,8 +54,7 @@ schema change rather than editing an already-applied one.
 
 ## 3. Read / write from handlers
 
-`ctx.cubby(alias)` returns a `CubbyHandle`
-(`packages/agent-sdk/src/types.ts`):
+`ctx.cubby(alias)` returns a `CubbyHandle`:
 
 ```ts
 interface CubbyHandle {
@@ -106,9 +105,8 @@ const rows = await ctx
 
 ## 4. The alias must be a declared string literal
 
-The `@cef-ai/cubby-declared-alias` ESLint rule
-(`packages/eslint-plugin/src/rules/cubby-declared-alias.ts`) enforces two
-things on `ctx.cubby(...)`:
+The `@cef-ai/cubby-declared-alias` ESLint rule enforces two things on
+`ctx.cubby(...)`:
 
 1. The first argument **must be a string literal** — not a variable or
    expression. `ctx.cubby(someVar)` is a lint error (`notLiteral`).

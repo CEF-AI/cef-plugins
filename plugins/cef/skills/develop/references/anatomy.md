@@ -1,7 +1,7 @@
 # Project anatomy & runtime model
 
 A CEF agent is authored as a TypeScript project, compiled by `cef build` into a
-bundle + manifest, and executed by the Cere Agent Runtime (AR ADR-001). This
+bundle + manifest, and executed by the Cere Agent Runtime. This
 reference maps the files you'll touch to what the runtime and orchestrator
 actually consume.
 
@@ -72,8 +72,7 @@ export default class Echo {
 ## What `defineAgent` accepts
 
 `defineAgent<T extends AgentConfig>(c: T): T` is just an identity function that
-preserves literal types. Key `AgentConfig` fields (see
-`packages/agent-sdk/src/config/define-agent.ts`):
+preserves literal types. Key `AgentConfig` fields:
 
 - **`id`** (required) — marketplace alias. The signed `agentId` is
   `"{agentServicePubkey}:{uuid}"`, assigned by publish — `id` is the alias, not
@@ -82,7 +81,7 @@ preserves literal types. Key `AgentConfig` fields (see
 - **`entry`** OR **`engagements[]`** — *exactly one*. `entry: "./src/agent.ts"`
   is shorthand for `engagements: [{ id: "default", entry }]`. Multi-engagement
   form: each `{ id, entry, goal?, condition?, priority?, weight?, limit?,
-  params?, enabled? }` (ADR-038 on-declaration selection fields, mirroring the
+  params?, enabled? }` (on-declaration selection fields, mirroring the
   `@Condition`/`@Priority`/`@Weight`/`@Limit`/`@Params` class decorators).
 - **`cubbies`** — `[{ alias, migrations? }]`. `alias` must match every
   `ctx.cubby("alias")` call (build lints this).
@@ -100,7 +99,7 @@ preserves literal types. Key `AgentConfig` fields (see
 - **`eventSchemas`** — JSON Schemas for events this agent *owns* (see "Typed
   event payloads" below).
 - **`agentServicePubkey`** — optional; stamps full identity at build time.
-- **`targeting`** — DEPRECATED (ADR-038): use on-engagement fields instead.
+- **`targeting`** — DEPRECATED: use on-engagement fields instead.
 
 ## Typed event payloads (`eventSchemas` + `cef typegen`)
 

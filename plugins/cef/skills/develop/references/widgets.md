@@ -4,7 +4,7 @@ A **widget** is a self-contained static web UI (an entry HTML plus sibling JS/as
 
 ## Declaring a widget
 
-Add a `widgets: [...]` array to `defineAgent(...)`. Each entry is a `WidgetDecl` (see `packages/agent-sdk/src/config/define-agent.ts`). Minimal, real-fixture example (`packages/cli/test/fixtures/widget-agent/cef.config.ts`):
+Add a `widgets: [...]` array to `defineAgent(...)`. Each entry is a `WidgetDecl`. Minimal example:
 
 ```ts
 import { defineAgent } from "@cef-ai/agent-sdk/config";
@@ -46,7 +46,7 @@ export default defineAgent({
 | `queries` | no | Named SQL queries: `{ id, label?, sql, timeoutMs? }[]`. |
 | `events` | no | Event types the widget subscribes to. |
 
-All fields except `id`/`dir`/`entry` are metadata copied verbatim into the manifest (`ManifestWidget` in `packages/cli/src/build/manifest.ts`).
+All fields except `id`/`dir`/`entry` are metadata copied verbatim into the manifest.
 
 ## Building a self-contained widget dir
 
@@ -74,8 +74,8 @@ That's a complete, valid widget. Keep the starter widget plain like this — do 
 
 ## How `cef build` and `cef push` handle it
 
-- **`cef build`** copies whatever is in each `dir` into `dist/<agentId>/widgets/<id>/` (fresh each build — stale files are removed first). It also emits one `ManifestWidget` per declared widget with a **placeholder** `dag: { bucketId: "", cid: "" }`. If `dir` is missing, or the `entry` file isn't found inside it, build prints a WARNING but still emits the manifest entry. (`packages/cli/src/commands/build.ts` → `stageWidgets`.)
-- **`cef push`** reads each staged `dist/<agentId>/widgets/<id>/` directory, uploads it to DDC as one content-addressed directory DAG, and stamps the real `{ bucketId, cid }` into that widget's manifest entry. A widget with no staged directory (or an empty one) is skipped with a WARNING. (`packages/cli/src/commands/push.ts`.)
+- **`cef build`** copies whatever is in each `dir` into `dist/<agentId>/widgets/<id>/` (fresh each build — stale files are removed first). It also emits one `ManifestWidget` per declared widget with a **placeholder** `dag: { bucketId: "", cid: "" }`. If `dir` is missing, or the `entry` file isn't found inside it, build prints a WARNING but still emits the manifest entry.
+- **`cef push`** reads each staged `dist/<agentId>/widgets/<id>/` directory, uploads it to DDC as one content-addressed directory DAG, and stamps the real `{ bucketId, cid }` into that widget's manifest entry. A widget with no staged directory (or an empty one) is skipped with a WARNING.
 
 So the flow is: `build:widgets` (your own) → `cef build` (stage into dist) → `cef push` (upload as DAG + stamp ref).
 

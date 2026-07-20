@@ -1,6 +1,6 @@
 # Agent code: engagements, events, lifecycle
 
-A CEF agent is one or more **engagements** — goal-bound code units (ADR-019). Each
+A CEF agent is one or more **engagements** — goal-bound code units. Each
 engagement is a class **default-exported** from its own module, decorated with
 `@Engagement(...)`. Event and lifecycle handlers are methods on that class. All
 decorators come from `@cef-ai/agent-sdk`; types are imported `type`-only.
@@ -107,7 +107,7 @@ it out-of-band) and `fetch` for HTTP. Do not expect `ctx.log`/`ctx.fetch`.
 - `ctx.publish(type, payload)` → publish an event (awaitable).
 - `ctx.settings` → frozen `ConnectionSettings` the user supplied at connect time.
 - `ctx.params` → frozen effective params (manifest ⊕ deployment ⊕ engagement,
-  resolved by the orchestrator; ADR-038 §3.6).
+  resolved by the platform).
 - `ctx.close(reason?)` → ask the runtime to close this agent.
 
 ## String-literal rules for `@OnEvent` / `ctx.publish`
@@ -154,5 +154,5 @@ export default defineAgent({
 
 The engagement `id` in the class decorator must match the `id` in the config entry.
 Selection metadata can also be authored on-class via `@Condition`, `@Priority`,
-`@Weight`, `@Limit`, `@Params` (ADR-038 §3.3/§3.6); `cef build` folds these into the
+`@Weight`, `@Limit`, `@Params`; `cef build` folds these into the
 manifest.
