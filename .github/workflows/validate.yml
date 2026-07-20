@@ -1,0 +1,44 @@
+name: validate
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON manifests
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          found=0
+          for f in .claude-plugin/marketplace.json plugins/**/.claude-plugin/plugin.json; do
+            [ -e "$f" ] || continue
+            found=1
+            echo "Validating $f"
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No plugin manifests present yet — nothing to validate (ok)."
+          fi
+
+      - name: Check SKILL.md frontmatter
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          for f in plugins/**/skills/**/SKILL.md; do
+            echo "Checking $f"
+            head -1 "$f" | grep -q '^---$' \
+              || { echo "::error file=$f::SKILL.md must start with YAML frontmatter (---)"; exit 1; }
+            grep -q '^name:' "$f" \
+              || { echo "::error file=$f::SKILL.md frontmatter missing 'name:'"; exit 1; }
+            grep -q '^description:' "$f" \
+              || { echo "::error file=$f::SKILL.md frontmatter missing 'description:'"; exit 1; }
+          done
+          echo "SKILL.md frontmatter checks passed."

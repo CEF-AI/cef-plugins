@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Keep GitHub Actions used in workflows up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  # NOTE: add an "npm" ecosystem entry here if/when a plugin gains a
+  # package.json (e.g. for hook scripts or a build step).
