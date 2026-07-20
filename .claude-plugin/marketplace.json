@@ -1,0 +1,12 @@
+{
+  "name": "cef",
+  "owner": { "name": "Cere / CEF-AI" },
+  "description": "Tooling for authoring CEF agents",
+  "plugins": [
+    {
+      "name": "cef",
+      "source": "./plugins/cef",
+      "description": "Author, test, build, push, and deploy CEF agents"
+    }
+  ]
+}
