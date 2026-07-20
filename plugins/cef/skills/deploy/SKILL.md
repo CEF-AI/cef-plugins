@@ -7,24 +7,30 @@ description: Build, push, publish, and deploy a CEF agent to the platform. Use w
 
 Ship an agent through four stages: **build → push → publish → deploy**.
 
+In a scaffolded project run `cef` via `npx cef …` (it's a local dev-dep).
+
 ```bash
-cef build                                          # local: compile dist/<id>/{bundle.js,manifest.json}
-cef push    --bucket <id>      --as-pubkey <hex>   # OUTWARD: upload bundle to DDC registry
-cef publish --keystore <path>  --as-pubkey <hex>   # OUTWARD: sign + publish marketplace card
-# then a HUMAN in ROC clicks Deploy and selects the version (no cef deploy CLI yet)
+npx cef build                                          # local: compile dist/<id>/{bundle.js,manifest.json}
+npx cef push    --bucket <id>      --as-pubkey <hex>   # OUTWARD: upload bundle to DDC registry
+npx cef publish --keystore <path>  --as-pubkey <hex>   # OUTWARD: sign + publish marketplace card
+npx cef deploy  --endpoint <url>   --as-pubkey <hex>   # OUTWARD: pin a version live
 ```
 
-Stages 1–2 write to the shared DDC bucket; 3 publishes to the marketplace; 4
-and creating the Agent Service / minting tokens are **human actions in ROC**.
+Stages 1–3 write to DDC / the marketplace; stage 4 (`cef deploy`) applies a
+deployment via the platform API — the ROC **Deploy** button does the same.
+`--endpoint` defaults to dev (`$CEF_ENDPOINT` to override; test = swap
+`dev`→`test`). **Creating the Agent Service and minting the DDC token remain
+human actions in ROC.**
 
 ## Non-negotiable rules
 
 - **`push` and `publish` are outward-facing and hard to reverse.** Never run
   either without confirming with the user first (see checklist below). `build`
   is local and safe — run it freely.
-- **Do not run the Deploy step, create Agent Services, or mint tokens.** Those
-  are done by a human in the ROC console. Hand back the exact command/click.
-- **Never invent flags or commands.** Only `build`, `push`, `publish`,
+- **`cef deploy` is fine to run — but confirm first, like push/publish.** What
+  stays human-only is **creating the Agent Service and minting the DDC token**
+  in ROC; hand those back as steps, never fake them.
+- **Never invent flags or commands.** Only `build`, `push`, `publish`, `deploy`,
   `keypair`, `inspect` exist. Everything here is grounded in the references.
 
 ## Before push / publish — confirm identity, bucket, marketplace
@@ -63,7 +69,7 @@ The CLI's own error strings name the gate — surface them verbatim, then act.
 | `push`: missing `@cere-ddc-sdk/ddc-client` | Optional dep | `pnpm add @cere-ddc-sdk/ddc-client` |
 | `publish`: "run `cef push` first" (empty `bundle.cid`) | Push not run | `cef push --bucket <id> --as-pubkey <hex>` |
 | `publish`: REPLAY / HTTP 409 | Transient nonce reuse | Re-run `cef publish` |
-| Published, but a user's `connect` never gets served | No deployment | "Open ROC → the agent → **Deploy** → select version" |
+| Published, but a user's `connect` never gets served | No deployment | `npx cef deploy --endpoint <url> --as-pubkey <hex>` (or ROC → the agent → **Deploy**) |
 | `connect` rejected (agentId prefix mismatch) | Wrong AS pubkey | Re-push/publish with the **provisioned** AS pubkey |
 
 Rule of thumb: don't guess past the current gate — resolve it, then re-run.
@@ -72,13 +78,15 @@ Rule of thumb: don't guess past the current gate — resolve it, then re-run.
 
 - **Before push** — create the Agent Service (yields the AS pubkey) and mint a
   DDC registry access token. Walk the human through it.
-- **After publish** — click **Deploy** and select the version to make live;
-  the orchestrator serves only a version a deployment targets (ADR-038).
+- **After publish** — run `npx cef deploy` (or click **Deploy** in ROC) to make
+  a version live; the platform serves only a version a deployment targets
+  (ADR-038). `cef deploy` needs network reachability to the `--endpoint`.
 
 Full ROC walkthrough, the deployment set shape, and go-live rules:
 [references/roc-deploy.md](./references/roc-deploy.md).
 
 ## Shipping a new version
 
-Bump `version` in `cef.config.ts`, re-run build → push → publish, then in ROC
-either keep the `latest` default or pin the new semver for a controlled rollout.
+Bump `version` in `cef.config.ts`, re-run build → push → publish → `cef deploy`
+(pass `--version <semver>` to pin the new build, or deploy `latest`); or adjust
+the deployment in ROC for a controlled rollout.
