@@ -27,15 +27,19 @@ lives inside that sandbox — the constraints below are hard rules, not style.
 6. **Respect the runtime constraints on every edit** — no Node built-ins, string
    literals for `@OnEvent` / `ctx.publish` / `ctx.cubby`, declared aliases only.
 
-After changing `cef.config.ts`, run `cef typegen` so `@OnEvent` / `ctx.publish`
-literals autocomplete and type their payloads. Then `cef build` to lint + bundle.
+**Run `cef typegen` after any `cef.config.ts` change** — adding/changing a
+**model**, cubby, engagement, or `eventSchemas` entry. It types `ctx.models.*`
+(both **input and output** of `infer`/`stream`), `@OnEvent`, and `ctx.publish`
+from the declared model specs + event schemas; skip it and those stay untyped.
+(Model refs come from ROC — see `references/engagements.md`.) Then `cef build`
+to lint + bundle.
 
 ## ROUTING — read the reference before you edit that layer
 
 | You are… | Read | Covers |
 |---|---|---|
 | Orienting in an unfamiliar project | [anatomy.md](./references/anatomy.md) | file layout, `defineAgent` fields, manifest/`__handlers` model, build→push→publish→deploy |
-| Writing handlers / lifecycle / multi-engagement | [engagements.md](./references/engagements.md) | `@Engagement`/`@OnEvent`/`@OnStart`/`@OnClose`, `Event<P>`, the `ctx` surface, selection decorators |
+| Writing handlers / lifecycle / multi-engagement / using models | [engagements.md](./references/engagements.md) | `@Engagement`/`@OnEvent`/`@OnStart`/`@OnClose`, `Event<P>`, the `ctx` surface, `ctx.models` (+ typegen types, ROC refs), selection knobs |
 | Adding or querying persistent state | [cubbies.md](./references/cubbies.md) | `cubbies[]` decl, SQL migration ordering, `.query`/`.exec`, alias lint |
 | Shipping a static UI | [widgets.md](./references/widgets.md) | `WidgetDecl`, self-contained dirs, `cef push` DAG, `window.WidgetRuntime` |
 | Writing tests | [testing.md](./references/testing.md) | `testAgent`, `testPlatform`, model mocks, `dispatch`/`published`, harness members |
