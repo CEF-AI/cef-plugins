@@ -1,0 +1,5 @@
+# Code owners for CEF-AI/cef-plugins
+#
+# Every pull request requires review from a code owner
+# (enforced via branch protection on `main`).
+* @upalinski @spoluyan
