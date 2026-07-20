@@ -68,8 +68,11 @@ npx cef deploy [--version <v>] [--endpoint <url>] \
   files.
 - `--version` overrides the record `version` without editing files — the
   everyday "pushed a new build, roll it out" step.
-- The whole `deployments/` folder is applied as one set (declarative desired
-  state) — records deleted locally disappear remotely.
+- `--deployments <path>` points at the records: a directory (default
+  `deployments/`, one record per file) or a single set/record file — like
+  `kubectl apply -f <file|dir>`.
+- The whole set is applied at once (declarative desired state) — records removed
+  locally disappear remotely on the next deploy.
 - `--dry-run` shows what would be applied without applying it.
 
 ## Before push / deploy / publish — confirm identity, bucket, target

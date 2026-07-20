@@ -85,8 +85,9 @@ npx cef deploy [--version <v>] [--endpoint <url>] \
                [--as-pubkey <hex>] [--author <who>] [--note <msg>] [--dry-run]
 ```
 
-- Reads `deployments/` and applies the assembled SET. **Errors if the folder is
-  absent or empty** — there is nothing to deploy.
+- Reads the records and applies the assembled SET. **Errors if there are none.**
+  `--deployments <path>` points at a directory (default `deployments/`, one
+  record per file) or a single set/record file — like `kubectl apply -f`.
 - `--endpoint` (or `$CEF_ENDPOINT`) selects WHERE to apply, defaulting to the dev
   environment. It is **orthogonal** to the deployment files: the same
   `deployments/` folder applies to any environment. Do **not** put environment
