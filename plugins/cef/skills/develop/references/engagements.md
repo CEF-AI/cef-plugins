@@ -124,7 +124,9 @@ equal to the manifest's type string.
 **Single:** one file, one default-exported class (see `echo-agent`).
 
 **Multi:** one file per engagement, each with its own default-exported class. Wire
-them in `cef.config.ts` and pick between them with `targeting`:
+them in `cef.config.ts` and put the selection knobs **on each engagement** —
+`priority` (lower wins), `weight` (split traffic within a tier), `limit`, and a
+CEL `condition`:
 
 ```ts
 // src/engagements/simple.ts
@@ -140,19 +142,14 @@ export default class Simple {
 export default defineAgent({
   id: "multi-asst",
   engagements: [
-    { id: "advanced", entry: "./src/engagements/advanced.ts" },
-    { id: "simple",   entry: "./src/engagements/simple.ts" },
+    { id: "advanced", entry: "./src/engagements/advanced.ts", priority: 1, limit: { n: 10, per: "day" } },
+    { id: "simple",   entry: "./src/engagements/simple.ts",   priority: 2 },
   ],
-  targeting: {
-    engagements: [
-      { id: "advanced", rules: [{ name: "priority", value: 1 }, { name: "limit", value: 10 }] },
-      { id: "simple",   rules: [{ name: "priority", value: 2 }] },
-    ],
-  },
 });
 ```
 
-The engagement `id` in the class decorator must match the `id` in the config entry.
-Selection metadata can also be authored on-class via `@Condition`, `@Priority`,
-`@Weight`, `@Limit`, `@Params`; `cef build` folds these into the
-manifest.
+Equivalently, author the same knobs **on the class** with `@Condition` /
+`@Priority` / `@Weight` / `@Limit` / `@Params` — `cef build` folds either form
+into the manifest. The engagement `id` in the class decorator must match the
+config entry's `id`. (A deployment can then override an engagement's
+`priority`/`weight`/`limit` at deploy time.)

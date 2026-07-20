@@ -19,7 +19,6 @@ export default defineAgent({
   version: "0.1.0",
   entry: "./src/agent.ts",
   cubbies: [{ alias: "history", migrations: "./migrations/history" }],
-  lifecycle: "per-stream",
 });
 ```
 

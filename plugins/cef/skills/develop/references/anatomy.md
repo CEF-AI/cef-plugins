@@ -2,7 +2,7 @@
 
 A CEF agent is authored as a TypeScript project, compiled by `cef build` into a
 bundle + manifest, and executed by the Cere Agent Runtime. This
-reference maps the files you'll touch to what the runtime and orchestrator
+reference maps the files you'll touch to what the runtime and platform
 actually consume.
 
 ## What a project contains
@@ -74,9 +74,9 @@ export default class Echo {
 `defineAgent<T extends AgentConfig>(c: T): T` is just an identity function that
 preserves literal types. Key `AgentConfig` fields:
 
-- **`id`** (required) — marketplace alias. The signed `agentId` is
-  `"{agentServicePubkey}:{uuid}"`, assigned by publish — `id` is the alias, not
-  the composite id.
+- **`id`** (required) — the agent **alias**. The composite `agentId` is
+  `"{agentServicePubkey}:{alias}"` (the AS pubkey plus this alias); `id` is the
+  alias half, not the whole composite.
 - **`version`** (required) — semver string.
 - **`entry`** OR **`engagements[]`** — *exactly one*. `entry: "./src/agent.ts"`
   is shorthand for `engagements: [{ id: "default", entry }]`. Multi-engagement
@@ -94,12 +94,14 @@ preserves literal types. Key `AgentConfig` fields:
 - **`widgets`** — `WidgetDecl[]` (see above).
 - **`requiredScopes`** — vault scopes needed at connection (default `["default"]`).
 - **`idleTimeout`** — duration string (`"30m"` default; `"0s"` disables). Parsed
-  to ms into `manifest.idleTimeout`; on expiry the orchestrator marks the Job
+  to ms into `manifest.idleTimeout`; on expiry the platform marks the Job
   terminal and dispatches the synthetic close event.
 - **`eventSchemas`** — JSON Schemas for events this agent *owns* (see "Typed
   event payloads" below).
 - **`agentServicePubkey`** — optional; stamps full identity at build time.
-- **`targeting`** — DEPRECATED: use on-engagement fields instead.
+- **`targeting`** (the agent-config engagement table) — DEPRECATED: put
+  selection knobs on each engagement instead (see engagements.md). Distinct from
+  a *deployment's* `targeting` (audience CEL), which is current.
 
 ## Typed event payloads (`eventSchemas` + `cef typegen`)
 
@@ -147,10 +149,10 @@ opaque `globalThis.context`, and dispatches
   Event handlers are keyed `"<engagementId>::<method>"` (namespaced to stay
   collision-free across engagements); lifecycle hooks live under the fixed,
   NON-namespaced keys `onStart` / `onClose`.
-- **`manifest.json`** — the **routing table** the orchestrator consults. Each
+- **`manifest.json`** — the **routing table** the platform consults. Each
   engagement carries `handles{eventType -> handlerName}` (namespaced) and
-  `hooks[]` (`"start"`/`"close"`). The orchestrator returns handler-name strings
-  verbatim from `HandlerFor`, and AR looks them up directly on `__handlers`.
+  `hooks[]` (`"start"`/`"close"`). The platform looks up those handler names
+  directly on `globalThis.__handlers` to dispatch each event.
 
 Gotchas:
 - Only one engagement per agent may own each lifecycle hook — `cef build` errors
@@ -170,11 +172,14 @@ Gotchas:
 2. **`cef push`** — uploads the bundle and each widget dir to DDC as
    content-addressed objects/DAGs; stamps `{ bucketId, cid }` refs into the
    manifest. (`--as-pubkey <hex>` overrides identity.)
-3. **`cef publish`** — signs the manifest and registers it with the Marketplace
-   API (stub pending the API). Fills `agentId`/`agentServicePubkey`/`signature`.
-4. **deploy** — a deployment record selects an engagement + pins a version; the
-   orchestrator resolves the manifest via the bucket-backed CDN registry and
-   dispatches Jobs against `__handlers`.
+3. **`cef deploy`** — apply the `deployments/` folder so a version is live for
+   connected users; the platform resolves the manifest from the bucket-backed
+   registry and dispatches Jobs against `__handlers`. This is what makes an
+   agent run.
+4. **`cef publish`** — OPTIONAL, last: places the agent **card** on the
+   marketplace for discovery (a signed card envelope). The manifest is NOT sent
+   to the marketplace — it lives in the developer's DDC bucket (from `cef push`).
+   Skip publish for debug/test.
 
 Build-time lints (mirror `@cef-ai/eslint-plugin`): `@OnEvent(...)` and
 `ctx.publish(t, ...)` first args must be string literals; `ctx.cubby("alias")`
