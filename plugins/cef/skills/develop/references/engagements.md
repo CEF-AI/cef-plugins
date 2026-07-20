@@ -99,11 +99,18 @@ it out-of-band) and `fetch` for HTTP. Do not expect `ctx.log`/`ctx.fetch`.
   (per-agent scoped SQLite-style storage; alias must be declared in `cef.config.ts`).
 - `ctx.models` → model handles keyed by manifest-declared alias. Each is a
   `ModelHandle` with `infer(input)` (single-shot) and `stream(input)` (async
-  iterable). Aliases are typed via `KnownModels` (filled by `cef typegen`):
+  iterable). `cef typegen` fetches each declared model's spec and fills
+  `KnownModels`, so **both the input and the output** of `infer`/`stream` are
+  typed (e.g. `ModelHandle<GemmaInput, GemmaOutput>`) — not just the alias.
+  Without typegen the handle falls back to an untyped `ModelHandle`, so run
+  `cef typegen` after adding a model to get correct input/output types.
   ```ts
   const reply = await ctx.models.llm.infer({ prompt: event.payload.text });
   await ctx.publish("assistant_message", { text: reply.text });
   ```
+  **Finding models:** browse the available models and copy a model's `ref` from
+  **ROC** (there's no CLI command to list them). Paste it into `models` in
+  `cef.config.ts` — `models: { llm: "<ref-from-ROC>" }` — then run `cef typegen`.
 - `ctx.publish(type, payload)` → publish an event (awaitable).
 - `ctx.settings` → frozen `ConnectionSettings` the user supplied at connect time.
 - `ctx.params` → frozen effective params (manifest ⊕ deployment ⊕ engagement,

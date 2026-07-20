@@ -85,8 +85,9 @@ preserves literal types. Key `AgentConfig` fields:
   `@Condition`/`@Priority`/`@Weight`/`@Limit`/`@Params` class decorators).
 - **`cubbies`** — `[{ alias, migrations? }]`. `alias` must match every
   `ctx.cubby("alias")` call (build lints this).
-- **`models`** — `Record<alias, modelId>`; used via `ctx.models.<alias>` (lint
-  requires declared aliases).
+- **`models`** — `Record<alias, ref>`; used via `ctx.models.<alias>` (lint
+  requires declared aliases). Copy a model's `ref` from **ROC** (no CLI lists
+  them); `cef typegen` then types each handle's input/output. See engagements.md.
 - **`params`** — `Record<name, ParamDecl>` (`type`, `default`, `min`/`max`/`enum`;
   `"modelAlias"` must enumerate `models` keys). Resolved per Job as
   `manifest defaults ⊕ deployment ⊕ engagement` and surfaced as `ctx.params`.
