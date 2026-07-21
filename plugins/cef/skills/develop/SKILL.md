@@ -44,6 +44,7 @@ to lint + bundle.
 | Shipping a static UI | [widgets.md](./references/widgets.md) | `WidgetDecl`, self-contained dirs, `cef push` DAG, `window.WidgetRuntime` |
 | Writing tests | [testing.md](./references/testing.md) | `testAgent`, `testPlatform`, model mocks, `dispatch`/`published`, harness members |
 | Debugging a build failure or lint error | [constraints.md](./references/constraints.md) | banned imports, string-literal + declared-alias rules, ESLint wiring |
+| Debugging a running agent (empty logs, stuck Job, cubby errors) | [troubleshooting.md](./references/troubleshooting.md) | where logs go, logging that surfaces the cause, guard handlers, local repro with `testAgent`, common failure modes |
 
 ## The shape at a glance
 
