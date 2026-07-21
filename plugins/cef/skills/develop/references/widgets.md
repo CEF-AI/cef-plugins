@@ -246,11 +246,16 @@ same widget source works locally under `cef dev` and in production after
 
 ### What must be in the manifest vs what can live in the widget JS
 
-**Connection + scope must be in the manifest** — the runtime needs them *before*
-your JS runs (it builds the vault client + authenticates first), and they define
-what the widget may touch: `endpoints`, `wallet`, `agentId`, `cubbyAlias`. These
-can't move into the widget logic, because the logic depends on them already
-being resolved.
+**Connection + identity must be in the manifest** — the runtime needs them
+*before* your JS runs (it builds the vault client + authenticates first):
+`endpoints`, `wallet`, `agentId`. These can't move into the widget logic,
+because the logic depends on them already being resolved.
+
+**`cubbyAlias` is the widget's cubby binding.** It's optional if the widget
+never reads a cubby, but `query()` takes **no per-call cubby argument** — it
+always runs against `manifest.cubbyAlias` — so a widget that *does* query must
+declare its one cubby here. (You can't select the cubby from the `query()` call
+today.)
 
 **`queries[]` are a choice.** Declaring them powers the zero-JS declarative kinds
 (`list`/`record`/`dashboard`) and makes a widget's data access reviewable. But
