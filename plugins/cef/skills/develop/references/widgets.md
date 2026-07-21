@@ -48,11 +48,15 @@ loop is tight: start `cef dev`, open the printed URL, then edit the widget —
 **the page live-reloads on save** — and screenshot / read the console to verify
 the render and catch runtime errors, without manual refreshes.
 
-Know the boundary: the **wallet connect is interactive** — a human approves the
-Cere wallet popup, so an agent can't complete it and can't reach live cubby data
-on its own. What an agent *can* verify: the widget loads, its layout, the
-not-connected "Connect" CTA, and console errors (a bad query, a missing
-`WidgetRuntime` call). Hand the wallet-connect + live-data check to a human.
+The only human step is the **first** wallet connect (a person approves the Cere
+wallet popup once). The embed-wallet keeps its session in its own origin, so
+each live-reload **reconnects silently** — after that one approval the agent
+iterates on the fully-connected widget: edit → auto-reload → screenshot the live
+cubby data + read the console, no further popups. So an agent can verify the
+render, layout, the not-connected CTA, console errors (a bad query / missing
+`WidgetRuntime` call), *and* the connected/live-data state once a human has done
+the initial connect. (If your wallet setup re-prompts on reload or the session
+expires, the human re-approves — verify the behavior once.)
 
 ## Declaring a widget
 
