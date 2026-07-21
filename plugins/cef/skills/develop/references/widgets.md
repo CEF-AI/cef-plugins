@@ -1,106 +1,247 @@
 # Widgets
 
-A **widget** is a self-contained static web UI (an entry HTML plus sibling JS/assets) that an agent ships alongside its bundle. You declare it in `cef.config.ts`, build it into a plain directory, and `cef push` uploads the whole directory to DDC as one content-addressed **directory DAG** — next to `bundle.js`. There is no baked gateway URL: consumers resolve the widget at `<gateway>/<bucketId>/<cid>/<entry>`.
+A **widget** is a small web UI an agent ships alongside its bundle. At runtime a
+widget reads and writes the **viewing user's own vault** — as the connected
+agent — through an injected `window.WidgetRuntime`. No secret is baked into the
+widget; the user's key material stays in their wallet. The same widget renders
+two ways: **embedded** inside a host (the Cere Vault) and **standalone** via a
+direct link. Both talk to the SAME agent's cubby for the SAME user.
+
+You author a widget as source, iterate against your dev vault with `cef dev`,
+and ship it with `cef build` + `cef push`.
+
+> `cef dev` and `cef build`'s widget baking require a recent `@cef-ai/cli`.
+> Run `cef <cmd> --help` to confirm the flags available in your version.
+
+## The dev loop
+
+```sh
+cef init my-agent          # scaffolds an agent with a real, queryable widget
+cd my-agent && pnpm install
+
+cef dev hello              # local dev server for the `hello` widget
+#   - serves the widget on localhost
+#   - wires the manifest + the widget runtime
+#   - interactive wallet connect (a Cere wallet popup) — same auth as production standalone
+#   - watches files → refreshes on save
+
+# iterate: edit widgets/hello/*, save, the browser refreshes
+
+cef build --env dev        # bakes the manifest + runtime <script> into dist/
+cef push --env dev --bucket <bucketId> --as-pubkey <asPubkeyHex>
+#   open the returned CDN URL to run the widget standalone
+```
+
+`cef dev` is the primary test loop — it authenticates against your dev vault
+exactly the way a standalone link does in production, so what you see locally is
+what a user gets. `cef build` bakes the widget's manifest and a `<script>` tag
+for the runtime into the built output; `cef push` just uploads it.
+
+`cef dev [widgetId]` targets one widget by its declared `id`. Endpoints for the
+target environment are resolved from `--env` and baked into the manifest at
+build time (there is no runtime environment picker).
 
 ## Declaring a widget
 
-Add a `widgets: [...]` array to `defineAgent(...)`. Each entry is a `WidgetDecl`. Minimal example:
+Add a `widgets: [...]` array to `defineAgent(...)`. Each entry names a widget,
+picks a **kind**, points at the widget's source `dir` + `entry`, and (for every
+kind except `custom`) declares the **named queries** it runs against a cubby.
 
 ```ts
 import { defineAgent } from "@cef-ai/agent-sdk/config";
 
 export default defineAgent({
-  id: "widgetized",
+  id: "hiring",
   version: "1.0.0",
   entry: "./src/agent.ts",
+  cubbies: [{ alias: "history", migrations: "./migrations/history" }],
   widgets: [
     {
-      id: "dashboard",                 // stable, unique within the agent; used as the dist subdir
-      name: "Hiring Dashboard",        // optional display name
-      description: "Shows candidate pipeline",
-      cubbyAlias: "history",           // optional: cubby the widget reads/queries against
-      kind: "panel",                   // optional free-form host hint
-      config: { theme: "dark" },       // optional; carried verbatim into the manifest
-      queries: [                       // optional named SQL queries against the cubby
-        { id: "recent", label: "Recent", sql: "SELECT 1", timeoutMs: 5000 },
+      id: "candidates",                 // stable, unique within the agent; the dist subdir + `cef dev` target
+      name: "Candidate List",           // display name
+      kind: "list",                     // typed widget kind (see below)
+      cubbyAlias: "history",            // the cubby this widget queries
+      queries: [                        // named SQL, referenced by id from the widget
+        {
+          id: "recent",
+          label: "Recent candidates",
+          sql: "SELECT id, name, stage, ts FROM candidates ORDER BY ts DESC LIMIT ?",
+          timeoutMs: 5000,
+        },
       ],
-      events: ["candidate_added"],     // optional: event types the widget subscribes to
-      dir: "./widgets/dashboard",      // path (relative to cef.config.ts) to the BUILT widget dir
-      entry: "dashboard.html",         // entry file WITHIN dir
+      config: { columns: ["name", "stage"] },  // kind-specific config, carried verbatim
+      dir: "./widgets/candidates",      // path (relative to cef.config.ts) to the built widget source
+      entry: "candidates.html",         // entry file within dir
     },
   ],
 });
 ```
 
-### Field reference (`WidgetDecl`)
+### Field reference
 
 | Field | Required | Meaning |
 |---|---|---|
-| `id` | yes | Stable id, unique within the agent. Used as the dist subdir name. |
-| `dir` | yes | Path relative to `cef.config.ts` of the **already-built**, self-contained widget directory. |
-| `entry` | yes | Entry file within `dir`, e.g. `"dashboard.html"`. Resolved at `<gateway>/<bucketId>/<cid>/<entry>`. |
+| `id` | yes | Stable id, unique within the agent. The `cef dev` target and the dist subdir name. |
+| `kind` | yes | One of the widget kinds below. Selects the typed config + rendering. |
+| `dir` | yes | Path (relative to `cef.config.ts`) to the widget's source directory. |
+| `entry` | yes | Entry file within `dir`, e.g. `"candidates.html"`. |
+| `queries` | yes, except `kind: "custom"` | Named SQL run against the cubby: `{ id, label?, sql, timeoutMs? }[]`. |
+| `cubbyAlias` | for query-backed kinds | Cubby alias the widget reads. Must be a declared cubby. |
 | `name` / `description` | no | Human-friendly display metadata. |
-| `cubbyAlias` | no | Cubby alias the widget reads/queries against. |
-| `kind` | no | Free-form widget-kind hint for the host. |
-| `config` | no | Arbitrary widget-specific config, carried verbatim into the manifest. |
-| `queries` | no | Named SQL queries: `{ id, label?, sql, timeoutMs? }[]`. |
-| `events` | no | Event types the widget subscribes to. |
+| `config` | no | Kind-specific configuration, carried verbatim into the manifest. |
+| `events` | no | Event types the widget subscribes to for live updates. |
 
-All fields except `id`/`dir`/`entry` are metadata copied verbatim into the manifest.
+## Widget kinds
 
-## Building a self-contained widget dir
+Every widget declares a `kind`. Each kind has a typed `config` and a standard
+rendering, so you describe *what* to show rather than hand-rolling the UI:
 
-The directory must be **fully self-contained**: the entry HTML references its siblings via `./relative` paths only (no external CDNs, no absolute URLs), because everything is served under one directory CID. A "hello-world" widget needs no framework and no runtime — just HTML + JS.
+| Kind | Shows |
+|---|---|
+| `record` | A single row — one entity's fields (one query returning one row). |
+| `list` | Rows from a query as a list/table. |
+| `dashboard` | Several queries composed into panels/metrics. |
+| `submit` | A form that `publish()`es an event to the agent. |
+| `conversation` | A chat-style stream of events for a conversation context. |
+| `composite` | A layout combining several of the above. |
+| `custom` | You own the rendering. No `queries` requirement — call `WidgetRuntime` yourself. |
 
-Real fixture (`packages/cli/test/fixtures/widget-agent/widgets/dashboard/`):
+Reach for a built-in kind first; drop to `custom` only when the standard kinds
+can't express the UI you need.
 
-`dashboard.html`:
+## `window.WidgetRuntime`
+
+The runtime is injected for you — by `cef dev` locally, by `cef build`'s baked
+`<script>` in production. It resolves the viewing user's identity, connects to
+their vault as the agent, and exposes:
+
+```ts
+window.WidgetRuntime.query(ref, params?)   // ref = a named query id (from queries[]) OR raw SQL
+                                            //   → { columns, rows, meta }; params are BOUND, never interpolated
+window.WidgetRuntime.publish(type, payload, context?)   // → { eventId }
+window.WidgetRuntime.identity()             // → { publicKey, status }
+window.WidgetRuntime.agentStatus()          // → "connected" | "disconnected"
+window.WidgetRuntime.connect()              // ensure a user session (interactive connect when standalone)
+window.WidgetRuntime.connectAgent()         // the "install" step: connect this agent for this user
+window.WidgetRuntime.onIdentityChange(cb)   // subscribe to identity/status changes
+```
+
+`query(ref, params?)` takes either a **named query id** from your `queries[]`
+declaration or **raw SQL**, plus a `params` array bound to `?` placeholders —
+never string-concatenate values into SQL. It returns a columnar
+`{ columns, rows, meta }`.
+
+### Example — a `list` widget
+
+`candidates.html`:
+
 ```html
 <!doctype html>
 <meta charset="utf-8" />
-<title>Hiring Dashboard</title>
-<div id="root"></div>
-<script src="./app.js"></script>
+<title>Candidate List</title>
+<div id="root">Loading…</div>
+<script src="./candidates.js"></script>
 ```
 
-`app.js`:
+`candidates.js`:
+
 ```js
-document.getElementById("root").textContent = "hello from widget";
+const root = document.getElementById("root");
+
+async function render() {
+  try {
+    // "recent" is the query id declared in cef.config.ts; 20 binds to the ? placeholder.
+    const { columns, rows } = await window.WidgetRuntime.query("recent", [20]);
+    const name = columns.indexOf("name");
+    const stage = columns.indexOf("stage");
+    root.innerHTML = rows.length
+      ? rows.map((r) => `<div>${r[name]} — ${r[stage]}</div>`).join("")
+      : "No candidates yet.";
+  } catch (err) {
+    if (err.name === "AgentNotConnectedError") {
+      renderConnectCta();          // the agent isn't connected for this user yet
+    } else {
+      root.textContent = `Error: ${err.message}`;
+    }
+  }
+}
+
+function renderConnectCta() {
+  root.innerHTML = `<button id="connect">Connect agent</button>`;
+  document.getElementById("connect").onclick = async () => {
+    await window.WidgetRuntime.connectAgent();   // installs the agent for this user
+    render();
+  };
+}
+
+render();
 ```
 
-That's a complete, valid widget. Keep the starter widget plain like this — do not pull in the widget runtime until you actually need Vault access.
+A `record` widget is the same shape with a query that returns a single row; a
+`submit` widget collects form input and calls
+`window.WidgetRuntime.publish("candidate_added", { name, stage })`.
 
-> The CLI does NOT bundle or transform your widget. `dir` must already be built by the time you run `cef push`. If your widget needs a build step (bundler, TS), run it as the agent's own `build:widgets` script before `cef build`.
+### Connecting the agent (`connectAgent`)
 
-## How `cef build` and `cef push` handle it
+`query()` and `publish()` require the agent to be **connected** for the viewing
+user. When it isn't, `query()` throws `AgentNotConnectedError` — catch it and
+render a CTA wired to `connectAgent()`. `connectAgent()` is the one-time
+"install" flow: it connects the agent to the user's vault for the widget's
+scope. After it resolves, retry the query. Use `agentStatus()` to check state up
+front and `onIdentityChange(cb)` to re-render when the user connects,
+disconnects, or the agent's status changes.
 
-- **`cef build`** copies whatever is in each `dir` into `dist/<agentId>/widgets/<id>/` (fresh each build — stale files are removed first). It also emits one `ManifestWidget` per declared widget with a **placeholder** `dag: { bucketId: "", cid: "" }`. If `dir` is missing, or the `entry` file isn't found inside it, build prints a WARNING but still emits the manifest entry.
-- **`cef push`** reads each staged `dist/<agentId>/widgets/<id>/` directory, uploads it to DDC as one content-addressed directory DAG, and stamps the real `{ bucketId, cid }` into that widget's manifest entry. A widget with no staged directory (or an empty one) is skipped with a WARNING.
+## Embedded vs standalone
 
-So the flow is: `build:widgets` (your own) → `cef build` (stage into dist) → `cef push` (upload as DAG + stamp ref).
+The same widget runs in two modes; you write it once and the runtime handles the
+difference.
 
-## Optional: `window.WidgetRuntime` (Vault-native widgets)
+- **Embedded** — the widget runs inside a host (the Cere Vault). The host
+  supplies identity and signing over a bridge; the user is already
+  authenticated, so `connect()` resolves immediately.
+- **Standalone** — the widget is opened via a direct link. The runtime
+  authenticates the user itself with an interactive Cere wallet connect (a
+  popup). `cef dev` runs in this mode, so local iteration matches production
+  standalone.
 
-When a widget is loaded inside the Cere Vault host, an injected runtime (`@cef-ai/widget-runtime`, emerging) exposes `window.WidgetRuntime` for reading/writing the **viewing user's** own Vault as the connected agent — no baked secret, key material stays in the wallet iframe. Core surface:
+In both modes the widget queries the **same agent's cubby for the same user** —
+the only difference is where the identity comes from. Don't assume a host is
+present: rely on `WidgetRuntime` (which works in both) rather than reaching for
+host-specific globals.
 
-```ts
-window.WidgetRuntime.query(ref, params?)   // ref = a named query id (from queries[]) or raw SQL
-                                            //   → { columns, rows, meta }; params are BOUND, never interpolated
-window.WidgetRuntime.publish(type, payload, context?)  // → { eventId }
-window.WidgetRuntime.connectAgent()         // the "install" flow: getAgent + vault.agents.connect()
-window.WidgetRuntime.identity() / .connect() / .agentStatus() / .onIdentityChange(cb)
-```
+## The manifest
 
-`query()` throws `AgentNotConnectedError` when the agent isn't connected for this user — catch it to render a "Connect / Install" CTA wired to `connectAgent()`.
+`cef build` produces a **widget manifest** that the runtime reads at boot. It
+carries everything the widget needs to resolve identity, connect the agent, and
+run its queries — you don't assemble it by hand:
 
-Gotchas:
-- The runtime is injected by the upload/host step, not by `cef push`. Opened directly in a browser (no Vault host) it assigns `window.WidgetRuntime` synchronously but `query()`/`publish()` reject after an ~8s handshake deadline and render "Open this widget inside the Cere Vault."
-- Keep starter/hello-world widgets plain and self-contained. Only reach for the runtime once the widget genuinely needs Vault data.
+- `widgetId`, `name`, `kind`, `config` — from your `WidgetDecl`.
+- `agentId`, `scope`, `cubbyAlias` — which agent/cubby the widget binds to.
+- `queries[]` — `{ id, label, sql, timeoutMs }` from your declaration.
+- `wallet` — `{ appId, env }` used to build the interactive connect in standalone.
+- `endpoints` — the resolved `{ vault, gar, marketplace, s3GatewayAuthInfo }`
+  for the built `--env`.
+
+The runtime **reads** a manifest; it never builds one. The CLI owns manifest
+construction (from `cef.config.ts` + `--env` + the agent id), which is why the
+same widget source works locally under `cef dev` and in production after
+`cef build`.
 
 ## Gotchas checklist
 
-- `id`, `dir`, and `entry` are all required; `id` must be unique within the agent (build errors on duplicates).
-- `dir` must be **built already** — the CLI copies, it does not compile or bundle.
-- Reference siblings with `./relative` paths only; absolute/external URLs won't resolve under the directory CID.
-- A missing `dir` or `entry` produces a WARNING (not an error) at build; `cef push` then skips that widget — so a "successful" build can still ship no widget. Check push output for `widget <id>: dir DAG <cid> (<n> files)`.
-- No gateway URL is baked in; consumers build `<gateway>/<bucketId>/<cid>/<entry>` from the manifest ref.
+- **`kind` is required, and non-`custom` kinds need `queries`.** A query-backed
+  widget with no `queries` (or no `cubbyAlias`) has nothing to render.
+- **Query refs are ids or raw SQL, and params are bound.** Pass values in the
+  `params` array against `?` placeholders; never interpolate into SQL.
+- **Handle `AgentNotConnectedError`.** First load for a new user throws it —
+  render a `connectAgent()` CTA instead of an error.
+- **Endpoints are build-time baked from `--env`.** Build for the environment you
+  intend to run in; there is no runtime environment switch.
+- **Don't depend on a host.** Standalone has no host bridge — use
+  `WidgetRuntime`, not host-only globals, so the widget works in both modes.
+- **Reference siblings with `./relative` paths.** The widget is served as one
+  directory; absolute/external URLs won't resolve.
+- **`id` must be unique within the agent** and is what `cef dev [widgetId]`
+  targets.
+</content>
+</invoke>

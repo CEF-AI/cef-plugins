@@ -1,7 +1,7 @@
 {
   "name": "cef",
   "description": "Author, test, build, push, and deploy CEF agents",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": { "name": "Cere / CEF-AI" },
   "homepage": "https://github.com/CEF-AI/cef-plugins"
 }
