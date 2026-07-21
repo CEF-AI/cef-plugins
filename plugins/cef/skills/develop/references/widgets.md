@@ -23,9 +23,9 @@ cef dev hello              # local dev server for the `hello` widget
 #   - serves the widget on localhost
 #   - wires the manifest + the widget runtime
 #   - interactive wallet connect (a Cere wallet popup) — same auth as production standalone
-#   - watches files → refreshes on save
+#   - watches files → live-reloads the browser on save
 
-# iterate: edit widgets/hello/*, save, the browser refreshes
+# iterate: edit widgets/hello/*, save → the browser reloads automatically
 
 cef build --env dev        # bakes the manifest + runtime <script> into dist/
 cef push --env dev --bucket <bucketId> --as-pubkey <asPubkeyHex>
@@ -40,6 +40,19 @@ for the runtime into the built output; `cef push` just uploads it.
 `cef dev [widgetId]` targets one widget by its declared `id`. Endpoints for the
 target environment are resolved from `--env` and baked into the manifest at
 build time (there is no runtime environment picker).
+
+### Iterating with a coding agent
+
+If your coding agent can drive a browser (e.g. Claude Code's Chrome tools), the
+loop is tight: start `cef dev`, open the printed URL, then edit the widget —
+**the page live-reloads on save** — and screenshot / read the console to verify
+the render and catch runtime errors, without manual refreshes.
+
+Know the boundary: the **wallet connect is interactive** — a human approves the
+Cere wallet popup, so an agent can't complete it and can't reach live cubby data
+on its own. What an agent *can* verify: the widget loads, its layout, the
+not-connected "Connect" CTA, and console errors (a bad query, a missing
+`WidgetRuntime` call). Hand the wallet-connect + live-data check to a human.
 
 ## Declaring a widget
 
