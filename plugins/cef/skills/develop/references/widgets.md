@@ -244,6 +244,21 @@ construction (from `cef.config.ts` + `--env` + the agent id), which is why the
 same widget source works locally under `cef dev` and in production after
 `cef build`.
 
+### What must be in the manifest vs what can live in the widget JS
+
+**Connection + scope must be in the manifest** — the runtime needs them *before*
+your JS runs (it builds the vault client + authenticates first), and they define
+what the widget may touch: `endpoints`, `wallet`, `agentId`, `cubbyAlias`. These
+can't move into the widget logic, because the logic depends on them already
+being resolved.
+
+**`queries[]` are a choice.** Declaring them powers the zero-JS declarative kinds
+(`list`/`record`/`dashboard`) and makes a widget's data access reviewable. But
+`WidgetRuntime.query()` also accepts **raw SQL**, so a `kind: "custom"` widget
+can keep its query logic in the JS — `query("SELECT text, ts FROM messages …")`
+— with no `queries[]` at all. Either way the boundary that matters is the
+**scope** (agent + cubby + user), enforced by the runtime regardless of the SQL.
+
 ## Gotchas checklist
 
 - **`kind` is required, and non-`custom` kinds need `queries`.** A query-backed
