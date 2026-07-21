@@ -96,11 +96,13 @@ export default class Echo {
 ## Dev commands
 
 In a scaffolded project `cef` is a local dev-dependency, so run it via `npx cef …`
-(bare `cef` is not on `PATH`). A `cef init` project also aliases the common ones
-as npm scripts (`pnpm run build`, `pnpm test`).
+(bare `cef` is not on `PATH`). `cef init` does not install — run `pnpm install`
+once first. The project also aliases the common commands as npm scripts
+(`pnpm run build`, `pnpm test`, `pnpm dev`).
 
 ```sh
 npx cef typegen                 # after editing cef.config.ts: refresh .cef/generated.d.ts + cef.lock.json
+npx cef dev [widgetId]          # local widget dev server: standalone browser auth + file-watch
 npx cef build                   # lint entry + bundle → dist/<agentId>/{bundle.js, manifest.json}
 npx cef inspect dist/<agentId>  # verify exposed __handlers match manifest routing
 npx vitest run                  # run the @cef-ai/testing simulator tests  (or: pnpm test)
