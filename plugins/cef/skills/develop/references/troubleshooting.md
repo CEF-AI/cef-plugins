@@ -11,20 +11,27 @@ from a deployed agent. There is no `ctx.log` — use `console.*`.
 
 ## Logging that is actually debuggable
 
-- **Fold the error text into the message string.** The sandbox log keeps the
-  **message string** and may drop extra arguments (or render an `Error` as
-  `[object Object]`). So this hides the cause:
+- **Fold the error text into the message string.** The sandbox captures the
+  **first** console arg as the log `message` (via `.String()`) and
+  **JSON-serializes the rest** into a separate `args` field. The gotcha:
+  `JSON.stringify(new Error(...))` is `"{}"` — an `Error`'s `message`/`stack`
+  are non-enumerable — so passing the error as a *second* arg records an empty
+  `{}` and hides the cause:
 
   ```ts
-  console.error("failed to persist message", err);   // ✗ err is lost
+  console.error("failed to persist message", err);   // ✗ args: [{}] — err lost
   ```
 
-  and this surfaces it:
+  Put the detail in the first arg, where `.String()` preserves it
+  (`String(anError)` → `"Error: <message>"`):
 
   ```ts
   const detail = err instanceof Error ? err.message : String(err);
   console.error(`[history] failed to persist message: ${detail}`);   // ✓
   ```
+
+  (A *string* or plain object as a later arg serializes fine — it's specifically
+  `Error` objects that collapse to `{}`.)
 
 - **Prefix logs** with the subsystem (`[history]`, `[reply]`) so they're
   greppable in a busy log.
