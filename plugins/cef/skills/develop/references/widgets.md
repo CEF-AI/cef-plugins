@@ -43,7 +43,7 @@ build time (there is no runtime environment picker).
 
 ### Iterating with a coding agent
 
-If your coding agent can drive a browser (e.g. Claude Code's Chrome tools), the
+If your coding agent can drive a browser (e.g. via Playwright or a browser MCP), the
 loop is tight: start `cef dev`, open the printed URL, then edit the widget —
 **the page live-reloads on save** — and screenshot / read the console to verify
 the render and catch runtime errors, without manual refreshes.
@@ -76,6 +76,7 @@ export default defineAgent({
     {
       id: "candidates",                 // stable, unique within the agent; the dist subdir + `cef dev` target
       name: "Candidate List",           // display name
+      description: "Recent candidates", // optional display metadata
       kind: "list",                     // typed widget kind (see below)
       cubbyAlias: "history",            // the cubby this widget queries
       queries: [                        // named SQL, referenced by id from the widget
@@ -280,5 +281,3 @@ can keep its query logic in the JS — `query("SELECT text, ts FROM messages …
   directory; absolute/external URLs won't resolve.
 - **`id` must be unique within the agent** and is what `cef dev [widgetId]`
   targets.
-</content>
-</invoke>

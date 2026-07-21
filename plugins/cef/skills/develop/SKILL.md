@@ -69,11 +69,12 @@ export default class Echo {
 
   @OnEvent("user_message")
   async onMessage(event: Event<{ text: string }>, ctx: Context) {
+    const now = Date.now();
     await ctx.cubby("history").exec(
       "INSERT INTO messages(id, text, ts) VALUES (?, ?, ?)",
-      [Date.now(), event.payload.text, event.ts],
+      [now, event.payload.text, now],
     );
-    await ctx.publish("ack", { for: event.id });
+    await ctx.publish("ack", { text: `got: ${event.payload.text}` });
   }
 }
 ```
