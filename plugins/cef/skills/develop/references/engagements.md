@@ -31,11 +31,12 @@ export default class Echo {
 
   @OnEvent("user_message")
   async onMessage(event: Event<UserMessage>, ctx: Context) {
+    const now = Date.now();
     await ctx.cubby("history").exec(
       "INSERT INTO messages(id, text, ts) VALUES (?, ?, ?)",
-      [Date.now(), event.payload.text, event.ts],
+      [now, event.payload.text, now],
     );
-    await ctx.publish("ack", { for: event.id });
+    await ctx.publish("ack", { text: `got: ${event.payload.text}` });
   }
 
   @OnClose
@@ -78,13 +79,19 @@ type per engagement.
 
 ```ts
 interface Event<P = unknown> {
-  id: string;      // event id
-  type: string;    // event type string
-  ts: number;      // unix-millis timestamp
-  from: string;    // publisher (agent id or external source)
-  payload: P;      // typed body
+  type: string;        // event type string, e.g. "user_message"
+  payload: P;          // typed body
+  timestamp: string;   // ISO-8601, assigned by the vault
+  context?: string;    // stream context (conversation / partition key)
+  role?: string;       // publisher role, e.g. "user" | "agent"
+  eventId?: string;    // server-assigned id (UUID v7); may be absent inbound
 }
 ```
+
+The runtime hands the handler the **published event verbatim**, so read
+`event.payload` (typed) and `event.timestamp` (a string — `Date.parse(...)` for
+millis). There is no numeric `ts`; don't bind a missing field into a NOT NULL
+cubby column — use `Date.now()` for a record time, as above.
 
 Type the payload with your own interface: `Event<UserMessage>`, then read
 `event.payload.text`.

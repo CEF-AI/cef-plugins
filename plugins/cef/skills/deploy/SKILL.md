@@ -16,7 +16,8 @@ deployed, not because it is published.
 In a scaffolded project run `cef` via `npx cef …` (it's a local dev-dep).
 
 ```bash
-npx cef init                                          # scaffold a project (ships a deployments/ folder)
+npx cef init my-agent                                 # scaffold (does NOT install deps — fast)
+cd my-agent && pnpm install                           # install project deps (incl. the `cef` dev-dep)
 npx cef build                                         # local: compile dist/<id>/{bundle.js,manifest.json}
 npx cef push    --bucket <id>    --as-pubkey <hex>    # OUTWARD: upload bundle to the DDC registry
 npx cef deploy  --endpoint <url> --as-pubkey <hex>    # OUTWARD: apply deployments/ — makes the agent live

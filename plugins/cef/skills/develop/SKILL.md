@@ -44,6 +44,7 @@ to lint + bundle.
 | Shipping a static UI | [widgets.md](./references/widgets.md) | `WidgetDecl`, self-contained dirs, `cef push` DAG, `window.WidgetRuntime` |
 | Writing tests | [testing.md](./references/testing.md) | `testAgent`, `testPlatform`, model mocks, `dispatch`/`published`, harness members |
 | Debugging a build failure or lint error | [constraints.md](./references/constraints.md) | banned imports, string-literal + declared-alias rules, ESLint wiring |
+| Debugging a running agent (empty logs, stuck Job, cubby errors) | [troubleshooting.md](./references/troubleshooting.md) | where logs go, logging that surfaces the cause, guard handlers, local repro with `testAgent`, common failure modes |
 
 ## The shape at a glance
 
@@ -68,11 +69,12 @@ export default class Echo {
 
   @OnEvent("user_message")
   async onMessage(event: Event<{ text: string }>, ctx: Context) {
+    const now = Date.now();
     await ctx.cubby("history").exec(
       "INSERT INTO messages(id, text, ts) VALUES (?, ?, ?)",
-      [Date.now(), event.payload.text, event.ts],
+      [now, event.payload.text, now],
     );
-    await ctx.publish("ack", { for: event.id });
+    await ctx.publish("ack", { text: `got: ${event.payload.text}` });
   }
 }
 ```
@@ -96,11 +98,13 @@ export default class Echo {
 ## Dev commands
 
 In a scaffolded project `cef` is a local dev-dependency, so run it via `npx cef …`
-(bare `cef` is not on `PATH`). A `cef init` project also aliases the common ones
-as npm scripts (`pnpm run build`, `pnpm test`).
+(bare `cef` is not on `PATH`). `cef init` does not install — run `pnpm install`
+once first. The project also aliases the common commands as npm scripts
+(`pnpm run build`, `pnpm test`, `pnpm dev`).
 
 ```sh
 npx cef typegen                 # after editing cef.config.ts: refresh .cef/generated.d.ts + cef.lock.json
+npx cef dev [widgetId]          # local widget dev server: standalone browser auth + file-watch
 npx cef build                   # lint entry + bundle → dist/<agentId>/{bundle.js, manifest.json}
 npx cef inspect dist/<agentId>  # verify exposed __handlers match manifest routing
 npx vitest run                  # run the @cef-ai/testing simulator tests  (or: pnpm test)
