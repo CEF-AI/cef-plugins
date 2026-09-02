@@ -22,7 +22,7 @@ jobs:
         # Add "javascript-typescript" here once a plugin ships JS (e.g. hooks).
         language: [actions]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
