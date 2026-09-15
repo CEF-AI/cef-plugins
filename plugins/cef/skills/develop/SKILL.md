@@ -84,6 +84,17 @@ export default class Echo {
 - **No Node built-ins, no sync DB/network libs.** `fetch` for HTTP,
   `ctx.cubby` for state, `globalThis.crypto` (WebCrypto) instead of `node:crypto`.
   `cef build` bans `fs`/`net`/`http`/`child_process`/`pg`/`ws`/`axios`/… .
+- **`ctx.cubby` is scratch; `ctx.memory` is the shared bank.** Ask: *who reads
+  this later, and does each row need its own visibility?* Only this agent →
+  cubby. People or other agents, per-row sensitivity → `ctx.memory.upsert(…
+  {scope, privacy})` / `.relation(…)`; read back with `.search` / `.get` /
+  `.neighbours` / `.countByType`. `privacy` is REQUIRED on every write, one of
+  `public|internal|private|restricted` — the record's classification, never
+  defaulted. `neighbours` rows are typed
+  (`{id, type, title, scope, privacy, edgeType}`). The alias `"memory"` is
+  reserved for the bank — `cef build` warns on a cubby wearing it. Requires
+  `@cef-ai/agent-sdk` ≥ 4.1.0 and an orchestrator that stages
+  `endpoints.vault.memory`.
 - **Literals, statically read into the manifest.** `@OnEvent("...")`,
   `ctx.publish("...", …)`, and `ctx.cubby("...")` first args must be inline string
   literals; the cubby alias (and any `ctx.models.X`) must be **declared** in
