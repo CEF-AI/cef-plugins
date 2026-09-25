@@ -138,7 +138,8 @@ window.WidgetRuntime.query(ref, params?)   // ref = a named query id (from queri
                                             //   → { columns, rows, meta }; params are BOUND, never interpolated
 window.WidgetRuntime.publish(type, payload, context?)   // → { eventId }
 window.WidgetRuntime.identity()             // → { publicKey, status }
-window.WidgetRuntime.agentStatus()          // → "connected" | "disconnected"
+window.WidgetRuntime.agentStatus()          // → "connected" | "disconnected", or rejects with
+                                            //   WidgetAccessDeniedError (no grant) / WidgetVaultUnreachableError (host's vault won't open)
 window.WidgetRuntime.connect()              // ensure a user session (interactive connect when standalone)
 window.WidgetRuntime.connectAgent()         // the "install" step: connect this agent for this user
 window.WidgetRuntime.onIdentityChange(cb)   // subscribe to identity/status changes
@@ -220,13 +221,11 @@ must catch this itself — don't let it fall through to a generic error, and
 don't leave the screen empty:
 
 ```js
-import { accessDeniedHtml } from "@cef-ai/widget-runtime";
-
 try {
   const { columns, rows } = await window.WidgetRuntime.query("recent", [20]);
   // ... render rows
 } catch (err) {
-  const denied = accessDeniedHtml(err);
+  const denied = window.WidgetRuntime.accessDeniedHtml(err);
   if (denied) {
     root.innerHTML = denied; // "You don't have access to the … domain"
   } else if (err.name === "AgentNotConnectedError") {
@@ -240,7 +239,8 @@ try {
 `accessDeniedHtml(err)` returns the same copy the built-in kinds use (or
 `undefined` for any other error), naming `err.scopes` when the server sends
 them. Don't wire a "try again" to this one — a missing grant isn't fixed by
-retrying, only by an org owner granting it.
+retrying, only by an org owner granting it. A widget that bundles its own JS
+can instead `import { accessDeniedHtml } from "@cef-ai/widget-runtime"`.
 
 ## Embedded vs standalone
 

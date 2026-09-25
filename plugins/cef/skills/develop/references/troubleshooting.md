@@ -69,6 +69,7 @@ Run `pnpm test` (or `npx vitest run`) and add a case for the failing event.
 | `NOT NULL constraint failed: <table>.<col>` | A bound value was `undefined`/`null` | Guard/default the value before the write |
 | Widget: `AgentNotConnectedError` | The agent isn't connected for that user | Render a Connect CTA wired to `WidgetRuntime.connectAgent()`, then retry |
 | Widget: `WidgetAccessDeniedError` | Viewer has no grant on a domain the agent's service is connected on (403) | Built-in kinds show it automatically; in a `custom` widget render `accessDeniedHtml(err)` instead of an empty screen — no retry, a grant fixes it |
+| Widget: `WidgetVaultUnreachableError` | The host named a vault for this widget that can't be opened from here | Not "not connected" — no CTA fixes it; surface the error, don't fall back to the viewer's own vault |
 | Job stuck / no reply | An unguarded `throw` in a handler | Guard payloads; `try/catch` side effects; always `publish` a reply path |
 | Types don't match the model / event | `cef.config.ts` changed but types are stale | Run `cef typegen` |
 | `ctx.cubby(...)`: no orchestrator endpoint | Running the handler outside a Job context | Exercise it via `testAgent`, not by calling the class directly |
