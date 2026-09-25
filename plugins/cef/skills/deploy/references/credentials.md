@@ -6,6 +6,7 @@ easy to confuse:
 | Command | Identity | Key type | Where it goes |
 | --- | --- | --- | --- |
 | `cef push` | **DDC bucket owner** (or a token from them) | Sr25519 (substrate) | authorizes writes to the content-addressed bucket |
+| `cef push --vault` | **Your own wallet key** (or a wallet-api token) | Sr25519 or Ed25519 | authorizes vault-api to publish into a vault scope you can write |
 | `cef publish` | **Agent Service (AS)** | Ed25519 | signs the marketplace publish envelope |
 
 They are unrelated keys. `cef push` signs DDC writes with the bucket-owner
@@ -133,3 +134,60 @@ Gotchas:
 - On a bucket's first push the `agents` CNS root doesn't exist yet; push
   logs that it's creating the registry root (the internal resolve miss is
   expected, not a failure). Set `CEF_DEBUG` for full ddc-client logs.
+
+## Org vault publish (`cef push --vault`)
+
+For an agent that belongs to an **organization vault**, push through
+vault-api instead of writing DDC yourself. vault-api checks that the caller
+holds write on the scope (the vault owner, or a member with a member-level
+grant on it), writes the vault's registry bucket, and binds the agent's alias
+to the scope it is first published from, so another scope cannot replace it.
+
+```bash
+# The user has exported ONE of these in their own shell — never ask for the value:
+#   CEF_VAULT_SECRET_PHRASE  (their wallet key's phrase)   or   CEF_VAULT_TOKEN  (wallet-api token)
+cef push --vault <vaultId> --vault-scope <scope> \
+  --as-pubkey 0x<agent-service-pubkey> --env dev
+
+# ed25519 wallet key instead of the sr25519 default
+cef push --vault <vaultId> --vault-scope <scope> --sig-type ed25519 --as-pubkey 0x<hex>
+```
+
+Flags:
+
+- `--vault <vaultId>` + `--vault-scope <scope>` (both REQUIRED for this path).
+  `--vault-scope`, not `--scope` — `--scope` belongs to `--kind external`.
+- Exactly one credential: `--secret-phrase <phrase>` / `$CEF_VAULT_SECRET_PHRASE`
+  (the user's own wallet key; `--sig-type sr25519|ed25519`, default `sr25519`)
+  or `--vault-token <token>` / `$CEF_VAULT_TOKEN` (wallet-api bearer token).
+  Both or neither is an error. **`$CEF_DDC_SECRET_PHRASE` is never read here**
+  — it names a bucket owner, not the developer.
+- `--as-pubkey 0x<hex>` — stamps `agentId` / `agentServicePubkey` as on the
+  bucket path.
+- `--env dev|stage|prod` picks the vault-api endpoint; `--vault-api <url>`
+  overrides it.
+- `--agent <id>`, `--out <dir>` — as on the bucket path.
+- Refused with `--vault`: `--bucket`, `--access-token`, `--preset`,
+  `--endpoint`, `--cdn`. Refused without it: `--vault-scope`, `--vault-api`,
+  `--vault-token`, `--sig-type`. All vault flags are refused under
+  `--kind external`.
+
+The CLI uploads the version's files with the manifest **unstamped** (no
+`bundle` / widget `dag`); vault-api stamps the CIDs and returns the stored
+manifest, which `cef push` writes back to `dist/<id>/manifest.json`.
+
+Errors (the server's own code and message are appended to each):
+
+| Code / status | Meaning | What to do |
+| --- | --- | --- |
+| `403 ALIAS_NOT_YOURS` | The alias is bound to another scope (or is already in the registry unclaimed, which only the vault owner can claim) | Push from the alias's own scope, or rename the agent |
+| other `403` | No write on the scope, or the scope doesn't exist | Ask the vault owner for a member-level grant, or fix the scope name |
+| `409 REGISTRY_NOT_CONFIGURED` | The org has not enabled agent publishing (no registry bucket/delegation recorded, or it expired) | Only the org owner can fix it: ROC → the organization page → **Enable agent publishing**; then push again |
+| `503 REGISTRY_UNAVAILABLE` | Registry temporarily unreadable/unwritable; nothing changed | Retry |
+| `401` | Credential rejected | Check phrase/token, `--sig-type`, and clock skew (within 5 minutes) |
+| `404 VAULT_NOT_FOUND` | No such vault on this vault-api | Check `--vault` and `--env` |
+| `404` (no code) | This vault-api doesn't serve the publish route | Check `--vault-api` / `--env` |
+
+The direct-bucket path above is unchanged and remains the way to publish into
+a bucket that is not an org vault's registry (e.g. a personal Agent Service
+bucket).

@@ -20,6 +20,7 @@ npx cef init my-agent                                 # scaffold (does NOT insta
 cd my-agent && pnpm install                           # install project deps (incl. the `cef` dev-dep)
 npx cef build                                         # local: compile dist/<id>/{bundle.js,manifest.json}
 npx cef push    --bucket <id>    --as-pubkey <hex>    # OUTWARD: upload bundle to the DDC registry
+#   …or, into an organization vault (via vault-api):  npx cef push --vault <vaultId> --vault-scope <scope> --as-pubkey 0x<hex>
 npx cef deploy  --endpoint <url> --as-pubkey <hex>    # OUTWARD: apply deployments/ — makes the agent live
 npx cef publish --keystore <path> --as-pubkey <hex>   # OPTIONAL, LAST: list the card in the marketplace
 ```
@@ -35,6 +36,12 @@ npx cef publish --keystore <path> --as-pubkey <hex>   # OPTIONAL, LAST: list the
   does the same thing as `cef deploy`.
 - **Never invent flags or commands.** Everything here is grounded in the
   references.
+- **Never ask for, accept, or echo a secret** (secret phrase, access token,
+  vault token). Tell the user which env var to set in their own shell
+  (`$CEF_DDC_ACCESS_TOKEN`, `$CEF_DDC_SECRET_PHRASE`, `$CEF_VAULT_TOKEN`,
+  `$CEF_VAULT_SECRET_PHRASE`) and run the command without the secret flag so
+  the CLI reads the env var. Report only whether a variable is set, never its
+  value.
 
 ## The `deployments/` folder is the source of truth
 
@@ -76,6 +83,43 @@ npx cef deploy [--version <v>] [--endpoint <url>] \
   locally disappear remotely on the next deploy.
 - `--dry-run` shows what would be applied without applying it.
 
+## `cef push` — bucket or vault?
+
+`cef push` has two mutually exclusive destinations. Pick one; passing both
+`--bucket` and `--vault` is an error.
+
+| Destination | Use when | Who writes DDC |
+|---|---|---|
+| `--bucket <numericId>` (direct DDC) | The bucket is one you (or a ROC token) control — e.g. a personal Agent Service bucket | The CLI writes the registry DAG itself |
+| `--vault <vaultId> --vault-scope <scope>` | The agent belongs to an **organization vault** | vault-api checks you may write the scope, then writes the vault's registry bucket |
+
+If the user names an org / vault / scope, use the vault path; if they name a
+bucket id or a ROC access token, use the bucket path. If it's unclear, ask.
+
+```bash
+npx cef push --vault <vaultId> --vault-scope <scope> \
+  [--sig-type sr25519|ed25519] [--as-pubkey 0x<hex>] \
+  [--env dev|stage|prod] [--vault-api <url>] [--agent <id>] [--out dist]
+# credential from the env: $CEF_VAULT_SECRET_PHRASE (your wallet key) or $CEF_VAULT_TOKEN
+```
+
+- **Credential — exactly one:** `--secret-phrase` / `$CEF_VAULT_SECRET_PHRASE`
+  (the phrase of the **user's own** wallet key, which must hold write on the
+  scope; `--sig-type` sets its scheme, default `sr25519`) **or**
+  `--vault-token` / `$CEF_VAULT_TOKEN` (a wallet-api bearer token). Both =
+  error; neither = error. `$CEF_DDC_SECRET_PHRASE` is **never** used for a
+  vault push — it names a bucket owner, not the developer.
+- **DDC-only flags are refused with `--vault`:** `--bucket`, `--access-token`,
+  `--preset`, `--endpoint`, `--cdn`. `--vault-scope`, `--vault-api`,
+  `--vault-token`, and `--sig-type` are refused without `--vault`.
+- `--env` selects the vault-api endpoint (default dev); `--vault-api` overrides it.
+- The alias is **bound to the scope it is first published from** — later
+  versions must be pushed from that same scope.
+- On success vault-api stamps the bundle/widget CIDs and `cef push` writes the
+  returned manifest back to `dist/<id>/manifest.json`. Then `cef deploy` as usual.
+
+Details: [references/credentials.md](./references/credentials.md#org-vault-publish-cef-push---vault).
+
 ## Before push / deploy / publish — confirm identity, bucket, target
 
 Surface these to the user and get an explicit go-ahead before any outward call:
@@ -83,18 +127,21 @@ Surface these to the user and get an explicit go-ahead before any outward call:
 1. **AS pubkey** (`--as-pubkey <hex>`) — the Agent Service routing identity from
    ROC. Same value on push, deploy, and publish. A wrong pubkey means the agent
    is unroutable (`connect` rejects on an agentId prefix mismatch).
-2. **Bucket** (`--bucket <numericId>`, push only) — the AS's DDC registry bucket,
-   in decimal.
-3. **DDC auth** (push only) — exactly one of `--access-token` /
-   `$CEF_DDC_ACCESS_TOKEN` (ROC-minted, the common team case) or
-   `--secret-phrase` / `$CEF_DDC_SECRET_PHRASE` (bucket owner). Both = error;
-   neither = error.
+2. **Push destination** (push only) — either the bucket (`--bucket
+   <numericId>`, the AS's DDC registry bucket, in decimal) **or** the org
+   vault and scope (`--vault <vaultId> --vault-scope <scope>`), never both.
+3. **Push auth** (push only; confirm which env var is set, never its value) —
+   bucket path: exactly one of `--access-token` / `$CEF_DDC_ACCESS_TOKEN`
+   (ROC-minted, the common team case) or `--secret-phrase` /
+   `$CEF_DDC_SECRET_PHRASE` (bucket owner). Vault path: exactly one of
+   `$CEF_VAULT_TOKEN` or `$CEF_VAULT_SECRET_PHRASE` (+ `--sig-type`). Both =
+   error; neither = error.
 4. **Endpoint** (deploy) — echo the resolved `--endpoint` / `$CEF_ENDPOINT` so
    the user knows which environment goes live.
 5. **AS keypair** (publish) — resolved via `--privkey/--pubkey`, `CEF_AS_*` env,
    `--keystore`, or a `~/.config/cef/credentials` profile.
 
-Echo the resolved AS pubkey, bucket, endpoint, and (for publish) marketplace
+Echo the resolved AS pubkey, bucket (or vault + scope + `--env`/`--vault-api`), endpoint, and (for publish) marketplace
 URL, then ask to proceed. See
 [references/credentials.md](./references/credentials.md) for the two-identity
 model and resolution order.
@@ -112,6 +159,14 @@ The CLI's own error strings name the gate — surface them verbatim, then act.
 | `push`: "both … provided" | Ambiguous auth | Unset one of `$CEF_DDC_SECRET_PHRASE` / `$CEF_DDC_ACCESS_TOKEN` |
 | `push`: bundle/version not found | Build not run | `cef build` first |
 | `push`: missing `@cere-ddc-sdk/ddc-client` | Optional dep | `pnpm add @cere-ddc-sdk/ddc-client` |
+| `push --vault`: "no vault-api credential" / "provide only one of --vault-token … or --secret-phrase" | Vault credential | Have the user set exactly one of `$CEF_VAULT_TOKEN` / `$CEF_VAULT_SECRET_PHRASE` in their shell (never paste it into chat) |
+| `push --vault`: a DDC-only flag refused (`--bucket`, `--access-token`, `--preset`, `--endpoint`, `--cdn`) | Mixed destinations | Drop the DDC flag — a vault push has no bucket |
+| `push --vault`: `ALIAS_NOT_YOURS` | Alias belongs to another scope (or is unclaimed and only the owner can claim it) | Push from the scope the alias was first published from, or rename the agent |
+| `push --vault`: other 403 | No write on the scope, or scope doesn't exist | Ask the vault owner for a member-level grant on the scope, or fix `--vault-scope` |
+| `push --vault`: `REGISTRY_NOT_CONFIGURED` | Org hasn't enabled agent publishing | Only the org owner can fix it: "ROC → the organization page → **Enable agent publishing**", then push again |
+| `push --vault`: `REGISTRY_UNAVAILABLE` | Transient registry failure (nothing changed) | Retry the push |
+| `push --vault`: 401 | Credential rejected | Check the phrase/token, `--sig-type`, and the machine clock (±5 min) |
+| `push --vault`: 404 "does not serve the agent publish route" | vault-api too old / not configured | Check `--env` / `--vault-api` |
 | `deploy`: "no deployments/ folder" / empty folder | No records | Create `deployments/default.jsonc` (see reference), then re-run |
 | Pushed, but a user's `connect` never gets served | Not deployed | `npx cef deploy --endpoint <url> --as-pubkey <hex>` (or ROC → the agent → **Deploy**) |
 | `connect` rejected (agentId prefix mismatch) | Wrong AS pubkey | Re-push/deploy with the **provisioned** AS pubkey |
