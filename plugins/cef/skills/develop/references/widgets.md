@@ -209,6 +209,39 @@ scope. After it resolves, retry the query. Use `agentStatus()` to check state up
 front and `onIdentityChange(cb)` to re-render when the user connects,
 disconnects, or the agent's status changes.
 
+### Access denied (`WidgetAccessDeniedError`)
+
+`query()`, `publish()`, and `connectAgent()` throw `WidgetAccessDeniedError`
+when the vault opens but refuses the request (a 403) — the viewer has no grant
+on a domain the agent's service is connected on. The built-in kinds
+(`list`/`record`/`dashboard`/`submit`/`conversation`/`composite`) render this
+for you, naming the missing domain(s). A `custom` widget owns its own DOM, so it
+must catch this itself — don't let it fall through to a generic error, and
+don't leave the screen empty:
+
+```js
+import { accessDeniedHtml } from "@cef-ai/widget-runtime";
+
+try {
+  const { columns, rows } = await window.WidgetRuntime.query("recent", [20]);
+  // ... render rows
+} catch (err) {
+  const denied = accessDeniedHtml(err);
+  if (denied) {
+    root.innerHTML = denied; // "You don't have access to the … domain"
+  } else if (err.name === "AgentNotConnectedError") {
+    renderConnectCta();
+  } else {
+    root.textContent = `Error: ${err.message}`;
+  }
+}
+```
+
+`accessDeniedHtml(err)` returns the same copy the built-in kinds use (or
+`undefined` for any other error), naming `err.scopes` when the server sends
+them. Don't wire a "try again" to this one — a missing grant isn't fixed by
+retrying, only by an org owner granting it.
+
 ## Embedded vs standalone
 
 The same widget runs in two modes; you write it once and the runtime handles the
@@ -273,6 +306,10 @@ can keep its query logic in the JS — `query("SELECT text, ts FROM messages …
   `params` array against `?` placeholders; never interpolate into SQL.
 - **Handle `AgentNotConnectedError`.** First load for a new user throws it —
   render a `connectAgent()` CTA instead of an error.
+- **Handle `WidgetAccessDeniedError` in `custom` widgets.** A 403 (no grant on
+  a domain the service is connected on) throws this from `query`/`publish`/
+  `connectAgent`. Built-in kinds show it for you; a `custom` widget must render
+  it — see `accessDeniedHtml` above — instead of an empty screen.
 - **Endpoints are build-time baked from `--env`.** Build for the environment you
   intend to run in; there is no runtime environment switch.
 - **Don't depend on a host.** Standalone has no host bridge — use
