@@ -168,7 +168,7 @@ Flags:
   overrides it.
 - `--agent <id>`, `--out <dir>` — as on the bucket path.
 - Refused with `--vault`: `--bucket`, `--access-token`, `--preset`,
-  `--endpoint`, `--cdn`. Refused without it: `--vault-scope`, `--vault-api`,
+  `--endpoint`, `--cdn`, `--subject-phrase`. Refused without it: `--vault-scope`, `--vault-api`,
   `--vault-token`, `--sig-type`. All vault flags are refused under
   `--kind external`.
 

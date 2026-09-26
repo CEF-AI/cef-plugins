@@ -110,7 +110,7 @@ npx cef push --vault <vaultId> --vault-scope <scope> \
   error; neither = error. `$CEF_DDC_SECRET_PHRASE` is **never** used for a
   vault push — it names a bucket owner, not the developer.
 - **DDC-only flags are refused with `--vault`:** `--bucket`, `--access-token`,
-  `--preset`, `--endpoint`, `--cdn`. `--vault-scope`, `--vault-api`,
+  `--preset`, `--endpoint`, `--cdn`, `--subject-phrase`. `--vault-scope`, `--vault-api`,
   `--vault-token`, and `--sig-type` are refused without `--vault`.
 - `--env` selects the vault-api endpoint (default dev); `--vault-api` overrides it.
 - The alias is **bound to the scope it is first published from** — later
@@ -160,7 +160,7 @@ The CLI's own error strings name the gate — surface them verbatim, then act.
 | `push`: bundle/version not found | Build not run | `cef build` first |
 | `push`: missing `@cere-ddc-sdk/ddc-client` | Optional dep | `pnpm add @cere-ddc-sdk/ddc-client` |
 | `push --vault`: "no vault-api credential" / "provide only one of --vault-token … or --secret-phrase" | Vault credential | Have the user set exactly one of `$CEF_VAULT_TOKEN` / `$CEF_VAULT_SECRET_PHRASE` in their shell (never paste it into chat) |
-| `push --vault`: a DDC-only flag refused (`--bucket`, `--access-token`, `--preset`, `--endpoint`, `--cdn`) | Mixed destinations | Drop the DDC flag — a vault push has no bucket |
+| `push --vault`: a DDC-only flag refused (`--bucket`, `--access-token`, `--preset`, `--endpoint`, `--cdn`, `--subject-phrase`) | Mixed destinations | Drop the DDC flag — a vault push has no bucket |
 | `push --vault`: `ALIAS_NOT_YOURS` | Alias belongs to another scope (or is unclaimed and only the owner can claim it) | Push from the scope the alias was first published from, or rename the agent |
 | `push --vault`: other 403 | No write on the scope, or scope doesn't exist | Ask the vault owner for a member-level grant on the scope, or fix `--vault-scope` |
 | `push --vault`: `REGISTRY_NOT_CONFIGURED` | Org hasn't enabled agent publishing | Only the org owner can fix it: "ROC → the organization page → **Enable agent publishing**", then push again |
