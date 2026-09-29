@@ -148,9 +148,6 @@ to the scope it is first published from, so another scope cannot replace it.
 #   CEF_VAULT_SECRET_PHRASE  (their wallet key's phrase)   or   CEF_VAULT_TOKEN  (wallet-api token)
 cef push --vault <vaultId> --vault-scope <scope> \
   --as-pubkey 0x<agent-service-pubkey> --env dev
-
-# ed25519 wallet key instead of the sr25519 default
-cef push --vault <vaultId> --vault-scope <scope> --sig-type ed25519 --as-pubkey 0x<hex>
 ```
 
 Flags:
@@ -158,7 +155,7 @@ Flags:
 - `--vault <vaultId>` + `--vault-scope <scope>` (both REQUIRED for this path).
   `--vault-scope`, not `--scope` — `--scope` belongs to `--kind external`.
 - Exactly one credential: `--secret-phrase <phrase>` / `$CEF_VAULT_SECRET_PHRASE`
-  (the user's own wallet key; `--sig-type sr25519|ed25519`, default `sr25519`)
+  (the user's own wallet key, always signed as ed25519)
   or `--vault-token <token>` / `$CEF_VAULT_TOKEN` (wallet-api bearer token).
   Both or neither is an error. **`$CEF_DDC_SECRET_PHRASE` is never read here**
   — it names a bucket owner, not the developer.
@@ -169,7 +166,7 @@ Flags:
 - `--agent <id>`, `--out <dir>` — as on the bucket path.
 - Refused with `--vault`: `--bucket`, `--access-token`, `--preset`,
   `--endpoint`, `--cdn`, `--subject-phrase`. Refused without it: `--vault-scope`, `--vault-api`,
-  `--vault-token`, `--sig-type`. All vault flags are refused under
+  `--vault-token`. All vault flags are refused under
   `--kind external`.
 
 The CLI uploads the version's files with the manifest **unstamped** (no
@@ -184,7 +181,7 @@ Errors (the server's own code and message are appended to each):
 | other `403` | No write on the scope, or the scope doesn't exist | Ask the vault owner for a member-level grant, or fix the scope name |
 | `409 REGISTRY_NOT_CONFIGURED` | The org has not enabled agent publishing (no registry bucket/delegation recorded, or it expired) | Only the org owner can fix it: ROC → the organization page → **Enable agent publishing**; then push again |
 | `503 REGISTRY_UNAVAILABLE` | Registry temporarily unreadable/unwritable; nothing changed | Retry |
-| `401` | Credential rejected | Check phrase/token, `--sig-type`, and clock skew (within 5 minutes) |
+| `401` | Credential rejected | Check phrase/token and clock skew (within 5 minutes) |
 | `404 VAULT_NOT_FOUND` | No such vault on this vault-api | Check `--vault` and `--env` |
 | `404` (no code) | This vault-api doesn't serve the publish route | Check `--vault-api` / `--env` |
 

@@ -98,20 +98,20 @@ bucket id or a ROC access token, use the bucket path. If it's unclear, ask.
 
 ```bash
 npx cef push --vault <vaultId> --vault-scope <scope> \
-  [--sig-type sr25519|ed25519] [--as-pubkey 0x<hex>] \
+  [--as-pubkey 0x<hex>] \
   [--env dev|stage|prod] [--vault-api <url>] [--agent <id>] [--out dist]
 # credential from the env: $CEF_VAULT_SECRET_PHRASE (your wallet key) or $CEF_VAULT_TOKEN
 ```
 
 - **Credential — exactly one:** `--secret-phrase` / `$CEF_VAULT_SECRET_PHRASE`
   (the phrase of the **user's own** wallet key, which must hold write on the
-  scope; `--sig-type` sets its scheme, default `sr25519`) **or**
+  scope; always signed as ed25519, the only scheme vault-api accepts) **or**
   `--vault-token` / `$CEF_VAULT_TOKEN` (a wallet-api bearer token). Both =
   error; neither = error. `$CEF_DDC_SECRET_PHRASE` is **never** used for a
   vault push — it names a bucket owner, not the developer.
 - **DDC-only flags are refused with `--vault`:** `--bucket`, `--access-token`,
   `--preset`, `--endpoint`, `--cdn`, `--subject-phrase`. `--vault-scope`, `--vault-api`,
-  `--vault-token`, and `--sig-type` are refused without `--vault`.
+  and `--vault-token` are refused without `--vault`.
 - `--env` selects the vault-api endpoint (default dev); `--vault-api` overrides it.
 - The alias is **bound to the scope it is first published from** — later
   versions must be pushed from that same scope.
@@ -134,7 +134,7 @@ Surface these to the user and get an explicit go-ahead before any outward call:
    bucket path: exactly one of `--access-token` / `$CEF_DDC_ACCESS_TOKEN`
    (ROC-minted, the common team case) or `--secret-phrase` /
    `$CEF_DDC_SECRET_PHRASE` (bucket owner). Vault path: exactly one of
-   `$CEF_VAULT_TOKEN` or `$CEF_VAULT_SECRET_PHRASE` (+ `--sig-type`). Both =
+   `$CEF_VAULT_TOKEN` or `$CEF_VAULT_SECRET_PHRASE`. Both =
    error; neither = error.
 4. **Endpoint** (deploy) — echo the resolved `--endpoint` / `$CEF_ENDPOINT` so
    the user knows which environment goes live.
@@ -165,7 +165,7 @@ The CLI's own error strings name the gate — surface them verbatim, then act.
 | `push --vault`: other 403 | No write on the scope, or scope doesn't exist | Ask the vault owner for a member-level grant on the scope, or fix `--vault-scope` |
 | `push --vault`: `REGISTRY_NOT_CONFIGURED` | Org hasn't enabled agent publishing | Only the org owner can fix it: "ROC → the organization page → **Enable agent publishing**", then push again |
 | `push --vault`: `REGISTRY_UNAVAILABLE` | Transient registry failure (nothing changed) | Retry the push |
-| `push --vault`: 401 | Credential rejected | Check the phrase/token, `--sig-type`, and the machine clock (±5 min) |
+| `push --vault`: 401 | Credential rejected | Check the phrase/token and the machine clock (±5 min) |
 | `push --vault`: 404 "does not serve the agent publish route" | vault-api too old / not configured | Check `--env` / `--vault-api` |
 | `deploy`: "no deployments/ folder" / empty folder | No records | Create `deployments/default.jsonc` (see reference), then re-run |
 | Pushed, but a user's `connect` never gets served | Not deployed | `npx cef deploy --endpoint <url> --as-pubkey <hex>` (or ROC → the agent → **Deploy**) |
