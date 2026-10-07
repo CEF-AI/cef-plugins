@@ -181,3 +181,7 @@ Bump `version` in `cef.config.ts`, then re-run build → push → `cef deploy`
 deploy `latest`). Add a lower-priority or weighted record in `deployments/` for
 a controlled rollout. Re-run `cef publish` only if the marketplace card needs
 refreshing — it is not required for the new version to run.
+
+For a workflow, a pushed version can be evaluated before it goes live:
+`cef eval run <dataset> --workflow-version <semver>` pins it for the
+experiment's own runs only and compares it with the baseline — see `cef:evaluate`.
