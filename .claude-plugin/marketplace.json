@@ -6,7 +6,7 @@
     {
       "name": "cef",
       "source": "./plugins/cef",
-      "description": "Author, test, build, push, and deploy CEF agents"
+      "description": "Author, test, build, push, deploy, and evaluate CEF agents"
     }
   ]
 }
