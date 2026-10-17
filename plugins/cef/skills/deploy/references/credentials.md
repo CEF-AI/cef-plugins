@@ -134,6 +134,11 @@ Gotchas:
 - On a bucket's first push the `agents` CNS root doesn't exist yet; push
   logs that it's creating the registry root (the internal resolve miss is
   expected, not a failure). Set `CEF_DEBUG` for full ddc-client logs.
+- If push cannot read the existing registry (`[cef] could not read the
+  "agents" registry root …` or `… version record …`), it stops before
+  registering anything: writing without that read would unlink the bucket's
+  other agents or the agent's earlier versions. The bundle and manifest may
+  already be uploaded; nothing points at them. Retry the push.
 
 ## Org vault publish (`cef push --vault`)
 
