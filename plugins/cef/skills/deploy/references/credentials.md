@@ -139,6 +139,12 @@ Gotchas:
   registering anything: writing without that read would unlink the bucket's
   other agents or the agent's earlier versions. The bundle and manifest may
   already be uploaded; nothing points at them. Retry the push.
+  One exception on older storage nodes: when every replica of the registry is
+  down, some nodes still report it as `Cannot resolve CNS name`, which reads
+  as "missing", so push proceeds as on a first push and the new root lists
+  only this agent. If a push to a bucket that already had agents logs that
+  it is creating the registry root, check afterwards that the bucket's other
+  agents are still registered, and push any that are not again.
 
 ## Org vault publish (`cef push --vault`)
 
