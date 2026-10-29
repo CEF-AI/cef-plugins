@@ -32,8 +32,9 @@ npx cef release [version] [--title <text>] [--notes <text> | --notes-file <file>
      already cached for this graph is kept);
    - every dataset marked **Required for release** — blocks; cannot be skipped.
 3. A required dataset fails → no version is created, **exit 1**.
-4. Otherwise publishes the numbered version with its `release` block. Not
-   deployed; `latest` does not move.
+4. Otherwise re-checks the version number right before publishing (refused if
+   it already exists), then publishes the numbered version with its `release`
+   block. Not deployed; `latest` does not move.
 
 Defaults: `version` = the patch after the newest release; `--title` = the last
 commit's subject; `--notes` = commit subjects since the previous release.
@@ -123,5 +124,8 @@ same check flags as `cef release`.
 | "--vault needs --vault-scope" | Add `--vault-scope <scope>` |
 | "give --notes or --notes-file, not both" | Drop one |
 | `deploy`: "<v> has N review warnings. Re-run with --accept-warnings." | No terminal to ask (CI): confirm with the user, then add `--accept-warnings` |
-| `deploy`: "<v> is deployed …, but `latest` still names …" | Moving `latest` failed (credential?): fix it, re-run `cef deploy <v>` |
+| `release`: "<v> already exists" / "<v> was published while the checks ran; nothing was published. Release again with another number." | Version number taken: `cef release <another-version>` (or omit the version for the next patch) |
+| `deploy`: "repointing "default" would not make <v> live: "<row>" (<v'>) serves the default traffic beside or instead of it. cef deploy <version> moves only that one row; change a split or another serving row in ROC, or apply a deployments/ folder with cef deploy (no version)" | Another enabled, untargeted row (split, canary) keeps serving default traffic — or, when the message instead says `"default" does not serve the default traffic (it is targeted, or outranked)`, the default row itself is targeted or outranked: remove or retarget it in ROC (or apply a `deployments/` folder), then re-run `cef deploy <v>` |
+| `deploy`: "<workflow> has no "default" deployment to repoint" | Deploy once from ROC, or apply a `deployments/` folder with `cef deploy` (no version) |
+| `deploy`: "<v> is deployed …, but `latest` still names … Re-run cef deploy <v> to finish. (<cause>)" | The row moved; moving `latest` failed. The parenthesis is the DDC / vault-api error (credential, network): fix it, re-run `cef deploy <v>` |
 | `push` prints "is a workflow: this published an unchecked version" | Informational; prefer `cef release` + `cef deploy <version>` |
