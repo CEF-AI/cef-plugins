@@ -103,6 +103,25 @@ npx cef deploy [--version <v>] [--endpoint <url>] \
 The ROC console **Deploy** button applies the same deployment set; either path
 works.
 
+Without `<version>`, `cef deploy` applies this folder. With one
+(`cef deploy <version>`) it makes a **workflow release** live — see
+[workflow-releases.md](./workflow-releases.md).
+
+### Workflows in ROC: Save → Release → Deploy
+
+A workflow's Editor tab ships in three steps:
+
+- **Save** — writes the shared draft (with history).
+- **Release** — the same checks as `cef release` (AI review + datasets marked
+  Required for release) on a check candidate; numbers the version only if
+  they pass. `latest` does not move.
+- **Deploy** — makes a release live and moves `latest`; rollback = deploy an
+  older release. Same as `cef deploy <version>`.
+
+The **Releases** tab lists every release with its review, experiments, diff
+and deploys. Versions pushed with `cef push` show as "Not checked" and stay
+deployable.
+
 ## ROC setup step 1 — Agent Service + AS pubkey
 
 `cef push --as-pubkey <hex>`, `cef deploy --as-pubkey <hex>`, and

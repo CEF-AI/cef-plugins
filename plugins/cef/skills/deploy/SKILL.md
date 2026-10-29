@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Build, push, and deploy a CEF agent so it runs live (including in a sandbox); marketplace publish is optional and last. Use when shipping/releasing an agent or when the user asks to build/push/deploy/publish.
+description: Build, push, and deploy a CEF agent so it runs live (including in a sandbox); release and deploy a workflow version (cef release / cef deploy <version>, rollback); marketplace publish is optional and last. Use when shipping/releasing an agent or workflow or when the user asks to build/push/release/deploy/publish.
 ---
 
 # Deploy a CEF agent
@@ -25,9 +25,12 @@ npx cef deploy  --endpoint <url> --as-pubkey <hex>    # OUTWARD: apply deploymen
 npx cef publish --keystore <path> --as-pubkey <hex>   # OPTIONAL, LAST: list the card in the marketplace
 ```
 
+**Workflows:** `cef build` → `cef release` → `cef deploy <version>` instead of
+push → deploy. See [Workflow releases](#workflow-releases-cef-release--cef-deploy-version).
+
 ## Non-negotiable rules
 
-- **`push`, `deploy`, and `publish` are outward-facing.** Never run any of them
+- **`push`, `release`, `deploy`, and `publish` are outward-facing.** Never run any of them
   without confirming with the user first (see checklist below). `build` and
   `init` are local and safe — run them freely.
 - **Two setup steps remain human-only, done in the ROC console:** creating the
@@ -82,6 +85,36 @@ npx cef deploy [--version <v>] [--endpoint <url>] \
 - The whole set is applied at once (declarative desired state) — records removed
   locally disappear remotely on the next deploy.
 - `--dry-run` shows what would be applied without applying it.
+
+## Workflow releases: `cef release` → `cef deploy <version>`
+
+```bash
+npx cef release [version] [--title <text>] [--notes <text> | --notes-file <file>] [--skip-review]
+npx cef deploy <version> [--accept-warnings] [--dry-run]   # + DDC or --vault credentials to move `latest`
+```
+
+- `cef release` runs the **AI review** (never blocks; `--skip-review`) and every
+  dataset marked **Required for release** (blocks) on a check candidate
+  `0.0.0-c.<hash7>`. Publishes the numbered version only if every required
+  dataset passes; otherwise creates nothing and **exits 1**. Does **not**
+  deploy and does **not** move `latest`. `version` defaults to the next patch.
+- `cef deploy <version>` repoints the default deployment and moves `latest`.
+  **Rollback** = deploy an older release. Review warnings: a terminal asks, CI
+  needs `--accept-warnings`. Without `<version>`, `cef deploy` applies
+  `deployments/` as before.
+- **`latest` = the deployed version.** vault-api delivers a workflow's
+  events, schedules and webhooks from the manifest `latest` names.
+- `cef push` also moves `latest` (an unchecked version with no release
+  record). For workflows prefer `cef release` + `cef deploy`.
+- "Required for release" is set in ROC › the workflow › **Evaluations** › the
+  dataset heading: **not worse than live**, or **at least N%** accuracy.
+- Inspect: `cef release list | show <v> | diff <a> <b> [--json]`;
+  `cef check <v>` re-runs the checks on an existing release (exit 1 on failure,
+  release unchanged); `cef eval cases <experiment> [--failed]`.
+- On `cef deploy`, `--access-token`/`--endpoint` are the platform's; the DDC
+  ones are `--ddc-access-token`/`--ddc-endpoint`.
+
+Flags, credentials, errors: [references/workflow-releases.md](./references/workflow-releases.md).
 
 ## `cef push` — bucket or vault?
 
@@ -172,9 +205,16 @@ The CLI's own error strings name the gate — surface them verbatim, then act.
 | `connect` rejected (agentId prefix mismatch) | Wrong AS pubkey | Re-push/deploy with the **provisioned** AS pubkey |
 | Card missing from the marketplace (agent still runs) | Not published | `npx cef publish …` — optional, only for discovery |
 
+Workflow release / deploy errors:
+[references/workflow-releases.md](./references/workflow-releases.md#errors).
+
 Rule of thumb: don't guess past the current gate — resolve it, then re-run.
 
 ## Shipping a new version
+
+Workflow: `cef build` → `cef release` → `cef deploy <version>`.
+
+Other agents:
 
 Bump `version` in `cef.config.ts`, then re-run build → push → `cef deploy`
 (pass `--version <semver>` to roll the new build out without editing files, or
