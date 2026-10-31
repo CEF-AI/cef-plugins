@@ -21,7 +21,8 @@ Author, test, build, push, and deploy CEF agents. Skills:
 
 - **`cef:develop`** — author, extend, and debug agents (engagements, cubbies,
   migrations, widgets, tests). Loads automatically when you work on agent code.
-- **`cef:deploy`** — the `build → push → publish → deploy` workflow; confirms
+- **`cef:deploy`** — the `build → push → deploy → publish` flow, and
+  `build → release → deploy <version>` for workflows; confirms
   before outward-facing steps and guides the human-only ROC / credentials
   actions.
 
