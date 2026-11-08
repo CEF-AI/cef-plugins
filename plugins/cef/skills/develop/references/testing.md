@@ -102,6 +102,10 @@ lifecycle hook, while `h.dispose()` frees test resources (SQLite handles).
 - `advanceTime(ms)` / `now()` — manipulate the injected clock.
 - `snapshot()` / `restore(snap)` — capture/restore cubbies + clock + log.
 - `replay(jsonlPath)` — feed a JSONL fixture of events through the harness.
+- `memory` option → `testAgent(Agent, { memory: {} })` backs `ctx.memory` with a
+  fake bank (or pass `memory: fakeMemoryBank(...)` to share one with the test).
+  Without it, every `ctx.memory` call throws. **Requires `@cef-ai/testing` >= 4.0
+  (unpublished).**
 
 ## Model mocks
 
@@ -177,6 +181,33 @@ expect(rows).toEqual([
 - `p.runInCubby(agentId, alias, fn)` — assert on one agent's cubby.
 - `mockAgent(spec)` — a peer descriptor to stand in for an agent you don't
   want to pull into the test bundle. (`fromMarketplace(url)` throws in v1.)
+- `p.memory` — the platform's own fake memory bank (one per platform). **Requires
+  `@cef-ai/testing` >= 4.0 and `@cef-ai/agent-sdk` >= 5.13 (unpublished).** The
+  real `ctx.memory` code runs against it, and it enforces vault-api's rules:
+  - **Gate:** scope and privacy ceiling; a hidden record looks absent.
+  - **Statuses:** reads return accepted records unless `statuses` says otherwise.
+  - **Write policy: `curators` by default.**
+    - A workflow's `remember` or `ctx.memory.upsert` gets 403 `WRITE_REFUSED`.
+    - A harvester's writes land `proposed`, and it never rewrites a decided
+      record.
+    - An analyzer writes only `metric:`/`obs:` ids.
+  - **Options:** `testPlatform({ memory: { policy: "allow" } })` gives the old
+    permissive behaviour. `memory.connections[agentId] = { role, scopes,
+    ceiling, initiator }` configures one agent. `c3: false` models today's
+    vault-api: `idPrefix` and `domains` on list throw `UNSUPPORTED`, and a write
+    above the ceiling ends `NOT_LANDED` instead of a 403.
+  - **Helpers:** `seed(record)`, `accept(id)` / `reject(id)` (as a person, with
+    the review stamp), `supersede(id)`, `records`, `relations`, `props(id)`, and
+    `requests` (every door call with its body).
+  - The old module-wide `simulatedBank` is gone.
+
+  ```ts
+  p = testPlatform({ agents: { harvester: { source: Harvester } },
+                     memory: { connections: { harvester: { role: "harvester" } } } });
+  // …dispatch…
+  expect(p.memory.records.get("principle:hiring-icp")?.status).toBe("proposed");
+  ```
+  See [memory-bank.md](./memory-bank.md).
 
 ## Gotchas
 
