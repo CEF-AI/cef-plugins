@@ -1,7 +1,7 @@
 # The memory bank (`ctx.memory`, `ctx.workspace`)
 
 > **Requires `@cef-ai/agent-sdk` >= 5.13 and `@cef-ai/testing` >= 4.0, which are
-> unpublished as of 2026-11-08** (CEF-AI/sdk#307). On agent-sdk 5.12 and earlier,
+> unpublished as of 2026-11-08** (CEF-AI/sdk#309). On agent-sdk 5.12 and earlier,
 > `ctx.memory` has only `upsert`/`update`/`setPrivacy`/`delete`/`relation`/
 > `search(match, {limit})`/`get`/`neighbours`/`countByType`, and none of the
 > methods below exist. Check `node_modules/@cef-ai/agent-sdk/package.json` before
@@ -68,8 +68,8 @@ authorized in that scope may use it.
 
 ### `remember` / `relate` steps in a workflow are advised against
 
-- **On a vault running the `curators` write policy** (devnet now, testnet
-  from week 2), the bank refuses a workflow's write with 403.
+- **On a vault running the `curators` write policy**, the bank refuses a
+  workflow's write with 403.
 - **On a vault running `allow`**, the write lands as an *accepted* record that
   no person reviewed, which is worse.
 - **What `cef build` does about it:**
@@ -122,6 +122,9 @@ const res = await ctx.memory.propose({
   `source_hash` must fingerprint the inputs (the rows or evidence ids you read,
   and the config that shaped the claim), never the generated text.
   `sourceHash(x)` gives `sha256:<hex>` over canonical JSON with sorted keys.
+  It throws a `TypeError` on values JSON would silently change: a `Map`, a
+  `Set`, `NaN`/`Infinity`, a symbol, a bigint, a function or an invalid `Date`.
+  Convert a `Map` or `Set` to an object or array before you hash it.
 - **`opts.onDecided`** applies to an accepted record whose hash changed:
   - `"revise"`, the default, files the next revision;
   - `"skip"` writes nothing;
@@ -181,8 +184,8 @@ message prefix `[@cef-ai/agent-sdk] ctx.memory.<op> …`.
 |---|---|---|
 | `INVALID` | refused before any request (bad id, missing `domain` / `source_hash`, bad privacy…) | fix the input |
 | `NOT_LANDED` | acked but not kept (`err.current` is what the bank shows) | check the scope, the privacy vs the run initiator's ceiling, and whether a person decided it |
-| `WRITE_REFUSED` | 403 from a policy or role rule: a non-curator write under `curators`, an analyzer id or key rule, a platform-reserved id or edge, **or `err.serverCode === "PRIVACY_ABOVE_CEILING"`** | see below |
-| `SCOPE_DENIED` | 403: the scope is not one your connection writes | write to a scope the connection holds |
+| `WRITE_REFUSED` | 403 from a policy or role rule: a non-curator write under `curators`, an analyzer id or key rule, a platform-reserved id or edge, **or `err.serverCode === "PRIVACY_ABOVE_CEILING"`**. For a policy or role refusal the server sends `SCOPE_DENIED`, so `err.serverCode` is `"SCOPE_DENIED"` while `err.code` is `WRITE_REFUSED`. Branch on `err.code` | see below |
+| `SCOPE_DENIED` | 403: the scope is not one your connection writes (`err.message` lists the scopes it may write) | write to a scope the connection holds |
 | `NO_INITIATOR` | 403: the run has no initiator, so it has no ceiling. Slack/webhook-triggered runs can be like this | run from an event a person published, or a schedule |
 | `DECIDED` | `onDecided: "throw"` met a decided record | expected; `err.current` holds it |
 | `UNSUPPORTED` | the server ignored a facet only a newer vault-api understands (`idPrefix`, or `domains` on `list`) | drop the facet until vault-api with C3 is deployed. The SDK will not filter on the client |
@@ -248,7 +251,9 @@ const one = await ctx.memory.metric("metric:gtm-outreach-funnel:all@2026-11-01")
   - `domain`;
   - `analyzer` and `segment` (sent as `idPrefix`, so they need C3);
   - `keys`;
-  - `latest` (default true);
+  - `latest` (default true), which keeps the newest period for each segment.
+    A segment whose ids mix daily and weekly periods throws `INVALID`; read it
+    with `latest: false`;
   - `limit` (default 25, max 50, because it makes one read per record);
   - `cursor`;
   - `legacy: true`, which also lists the older `metric:<scope>:<analyzer>:…`
