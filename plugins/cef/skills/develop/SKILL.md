@@ -43,6 +43,7 @@ to lint + bundle.
 | Adding or querying persistent state | [cubbies.md](./references/cubbies.md) | `cubbies[]` decl, SQL migration ordering, `.query`/`.exec`, alias lint |
 | Shipping a static UI | [widgets.md](./references/widgets.md) | `WidgetDecl`, self-contained dirs, `cef push` DAG, `window.WidgetRuntime` |
 | Writing tests | [testing.md](./references/testing.md) | `testAgent`, `testPlatform`, model mocks, `dispatch`/`published`, harness members |
+| Reading or writing the org memory bank (curators, readers, metrics, workflow `remember`) — **requires agent-sdk >= 5.13 (unpublished)** | [memory-bank.md](./references/memory-bank.md) | workflows write their own cubby; `ctx.memory.propose` (proposed only, read-back, `NOT_LANDED`); typed reads accepted by default; metrics are measured; `ctx.workspace`; `PRIVACY_ABOVE_CEILING`; fake bank |
 | Debugging a build failure or lint error | [constraints.md](./references/constraints.md) | banned imports, string-literal + declared-alias rules, ESLint wiring |
 | Debugging a running agent (empty logs, stuck Job, cubby errors) | [troubleshooting.md](./references/troubleshooting.md) | where logs go, logging that surfaces the cause, guard handlers, local repro with `testAgent`, common failure modes |
 
