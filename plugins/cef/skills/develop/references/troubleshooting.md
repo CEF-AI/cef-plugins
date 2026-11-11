@@ -71,6 +71,7 @@ Run `pnpm test` (or `npx vitest run`) and add a case for the failing event.
 | Job stuck / no reply | An unguarded `throw` in a handler | Guard payloads; `try/catch` side effects; always `publish` a reply path |
 | Types don't match the model / event | `cef.config.ts` changed but types are stale | Run `cef typegen` |
 | `ctx.cubby(...)`: no orchestrator endpoint | Running the handler outside a Job context | Exercise it via `testAgent`, not by calling the class directly |
+| Workflow: a connector event (Slack, Telegram) arrives, the task succeeds, but no run, no step, no failure | The graph's connector trigger names a different `connection` than the event carries — typically a build without the `.env`, leaving a placeholder id baked into the graph | Read the stream for `workflow.not_started` (agent-sdk after 5.15, CEF-AI/sdk#322, unpublished): `reason` names the pair that arrived and the pairs the graph declares. Fix the build-time config, rebuild, redeploy. 5.15 and older only log it, as `no trigger in this graph takes this connector event` |
 
 ## Inspect state
 
