@@ -118,6 +118,28 @@ it out-of-band) and `fetch` for HTTP. Do not expect `ctx.log`/`ctx.fetch`.
   **Finding models:** browse the available models and copy a model's `ref` from
   **ROC** (there's no CLI command to list them). Paste it into `models` in
   `cef.config.ts` — `models: { llm: "<ref-from-ROC>" }` — then run `cef typegen`.
+- `ctx.memory` → the org memory bank. **Requires `@cef-ai/agent-sdk` >= 5.13
+  (unpublished).** On 5.12 and earlier only `upsert`/`update`/`setPrivacy`/
+  `delete`/`relation`/`search(match, {limit})`/`get`/`neighbours`/`countByType`
+  exist.
+  - **Readers:** `search(match, { types, domains, statuses, include, limit })`,
+    `list({ types, domain, statuses, include, limit, cursor })` and
+    `record(id)`. All return typed `MemoryRecord`s, **accepted by default**.
+  - **Curators (harvester / analyzer connections only):** `propose(...)` and
+    `proposeMetric(...)` / `proposeObservation(...)`. They always write
+    proposed, read back, and throw `MemoryError` `NOT_LANDED` if a write
+    didn't stick.
+  - **Measured metrics:** `metric(id)` / `metrics({ domain })`, labelled
+    "measured, not reviewed".
+  - **Workflows don't write the bank.** They write their own cubby table.
+  - Errors are `MemoryError` with a `code`. A 403 for privacy above the run
+    initiator's ceiling is `WRITE_REFUSED` with `serverCode:
+    "PRIVACY_ABOVE_CEILING"`.
+  - Full guide: [memory-bank.md](./memory-bank.md).
+- `ctx.workspace(alias, { scope? })` → the scope's shared `_shared` cubby
+  (same `query`/`exec` as `ctx.cubby`). This is where a workflow leaves rows
+  for a curator in another agent service. **Requires agent-sdk >= 5.13
+  (unpublished).**
 - `ctx.publish(type, payload)` → publish an event (awaitable).
 - `ctx.settings` → frozen `ConnectionSettings` the user supplied at connect time.
 - `ctx.params` → frozen effective params (manifest ⊕ deployment ⊕ engagement,
