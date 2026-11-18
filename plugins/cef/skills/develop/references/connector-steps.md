@@ -15,7 +15,7 @@ connector's answer the way it waits on an agent.
 
 ## Taking the connection from the run's data
 
-**Requires `@cef-ai/agent-sdk` with templated connections (the release after 5.15.0).**
+**Requires `@cef-ai/agent-sdk` 5.16.0 or later, and a ROC release with templated-connection support** (an older ROC would grant access to the template text and remove the real grant).
 
 When the connection depends on the run, for example a campaign's HeyReach
 account stored in its `campaign_setup` row, write `connection` as a mapping and
@@ -43,9 +43,9 @@ list every connection the step may use in `connections`:
 ## Access
 
 The vault only lets the workflow use connections it was granted. ROC writes
-those grants from the graph when you Deploy or Run: one per literal
-`connection`, and one per id in a templated step's `connections`. Every listed
-id must be a connection in the vault the workflow runs in.
+those grants from the graph: one per literal `connection`, and one per id in a
+templated step's `connections`. Every listed id must be a connection of the
+step's connector, in the vault the workflow runs in.
 
 The `cef` CLI does not write connector access. After a code deploy that adds an
 id to `connections`, press **Run** on the workflow's page in ROC to update its
