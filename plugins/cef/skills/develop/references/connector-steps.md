@@ -24,7 +24,7 @@ list every connection the step may use in `connections`:
 ```ts
 { id: "campaign-status", kind: "action", params: {
     connection: "={{ $json.heyreachConnectionId }}",
-    connections: ["cn_01a132aa7c0f7c818fcdd608fd92a12b", "cn_…second account…"],
+    connections: ["cn_heyreach_main", "cn_heyreach_second"],
     action: "get_campaign",
     input: { campaignId: "={{ $json.heyreachCampaignId }}" },
 } }
@@ -34,7 +34,7 @@ list every connection the step may use in `connections`:
   `validate` refuses `a templated connection needs connections: [the ids it may resolve to]`
   or `connections must list literal connection ids`.
 - The runner resolves the mapping against the step's input and trims it. It
-  sends nothing, and fails the step, when the id:
+  sends nothing, and fails the step (and so the run), when the id:
   - resolves empty: `<node>: connection resolved empty from <template>`;
   - is not listed: `<node>: connection <id> from the run's data is not one this step may use (<list>)`.
 - A plain `connection` (no leading `=`) works exactly as before; `connections`
@@ -48,5 +48,10 @@ those grants from the graph when you Deploy or Run: one per literal
 id must be a connection in the vault the workflow runs in.
 
 The `cef` CLI does not write connector access. After a code deploy that adds an
-id to `connections`, update the workflow's access in ROC (Deploy or Run from
-the workflow's page). Until then the vault refuses the send, and the step fails.
+id to `connections`, press **Run** on the workflow's page in ROC to update its
+access. Until then the vault refuses the send, and the step fails.
+
+Deploy a workflow with a templated connection with `cef deploy`, not ROC's
+Deploy button: ROC's Deploy links the workflow to ROC's bundled runner, and
+until that runner is agent-sdk 5.16.0 or later ROC refuses the step with
+"deploy this workflow with `cef deploy`".
