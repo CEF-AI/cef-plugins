@@ -7,7 +7,7 @@ connector's answer the way it waits on an agent.
 
 ```ts
 { id: "post", kind: "action", params: {
-    connection: "cn_01a1…",                         // which connection
+    connection: "cn_slack",                         // which connection
     action: "send_message",                         // what to do
     input: { channel: "={{ $json.channel }}", text: "hi" },
 } }
